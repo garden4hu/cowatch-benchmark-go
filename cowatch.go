@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	color "github.com/fatih/color"
-	cb "github.com/garden4hu/coWatchBenchmark"
+	cb "github.com/garden4hu/cowatchbenchmark"
 )
 
 func run(conf *Config) error {
