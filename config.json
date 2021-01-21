@@ -1,0 +1,11 @@
+{
+    "host": "http://server_host:80",
+    "room": 2,
+    "user": 10,
+    "msg_len": 1024,
+    "msg_frequency": 10,
+    "log_enable": 0,
+    "timeout": 25,
+    "start_time_room": "2021-01-20T21:34:00.00+08:00",
+    "start_time_user": ""
+}
