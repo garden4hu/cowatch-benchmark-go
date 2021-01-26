@@ -1,31 +1,47 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
+	"errors"
+	"time"
 
-	color "github.com/fatih/color"
 	cb "github.com/garden4hu/cowatchbenchmark"
 )
 
-func run(conf *Config) error {
+func getRooms(conf *Config) error {
 	if 0 == conf.Room {
 		return nil
 	}
-	rm := cb.NewRoomManager(conf.Host, conf.Room, conf.User, conf.Len, conf.Freq)
-	rm.RequestRoomsFromServer(conf.StartTimeRoom)
-	result := fmt.Sprintf("\n[INFO] Create room: %d, %d%% of target room:(%d), time consuming per room:%s\n", len(rm.Rooms), 100*len(rm.Rooms)/conf.Room, conf.Room, rm.GetCreatingRoomAvgDuration().String())
-	color.Set(color.FgYellow)
-	_, _ = fmt.Fprintf(os.Stdout, result)
-	color.Unset()
+	rm := cb.NewRoomManager(conf.Host, conf.Room, conf.User, conf.Len, conf.Freq, 25, 45)
 
-	resultFile := filepath.Join(filepath.Dir(os.Args[0]), "result.txt")
-	// write the result to local directory
-	f, err := os.Create(resultFile)
-	if err == nil {
-		defer f.Close()
-		_, _ = f.Write([]byte(result))
+	when, err := time.Parse(time.RFC3339, conf.StartTimeRoom)
+	if err != nil {
+		return errors.New("failed to parse the start Time for request room. check the configure file please")
+	}
+	_, err = time.Parse(time.RFC3339, conf.StartTimeUser)
+	if err != nil {
+		return errors.New("failed to parse the start Time for request user. check the configure file please")
+	}
+	if when.UnixNano() < time.Now().UnixNano() {
+		return errors.New("the start time(" + when.Local().String() + ") for creating room is expired, exit now")
+	}
+
+	if err = rm.RequestRoomsFromServer(when); err != nil {
+		return err
+	}
+	roomManager = rm
+	return nil
+}
+
+func getUsers(conf *Config) error {
+	when, _ := time.Parse(time.RFC3339, conf.StartTimeUser)
+	if when.UnixNano() < time.Now().UnixNano() {
+		return errors.New("the start time" + when.Local().String() + "for creating users is expired, exit now")
+	}
+	if roomManager == nil {
+		return errors.New("create room manager firstly please, exit now")
+	}
+	for i := 0; i < len(roomManager.Rooms); i++ {
+		go roomManager.Rooms[i].CreateUsers(when)
 	}
 	return nil
 }

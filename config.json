@@ -1,11 +1,12 @@
 {
-    "host": "http://server_host:80",
+    "host": "http://localhost:8080",
     "room": 2,
-    "user": 10,
+    "user": 3,
     "msg_len": 1024,
     "msg_frequency": 10,
     "log_enable": 0,
-    "timeout": 25,
-    "start_time_room": "2021-01-20T21:34:00.00+08:00",
-    "start_time_user": ""
+    "http_timeout": 25,
+    "websocket_timeout": 45,
+    "start_time_room": "2021-01-26T13:27:00.00+08:00",
+    "start_time_user": "2021-01-26T13:27:10.00+08:00"
 }
