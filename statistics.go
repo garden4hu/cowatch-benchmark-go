@@ -31,6 +31,6 @@ func printLogMessage(roomManager *cb.RoomManager, conf *Config) {
 		userSize += len(roomManager.Rooms[i].Users)
 	}
 	avgUsersConsume /= time.Duration(len(roomManager.Rooms))
-	info = fmt.Sprintf("[user information] created:%d  wanted:%d percent:%d time_consumption:%s", userSize, conf.Room*conf.User, userSize/(conf.Room*conf.User), avgUsersConsume.String())
+	info = fmt.Sprintf("[user information] created:%d  wanted:%d percent:%d time_consumption:%s", userSize, conf.Room*conf.User, userSize*100/(conf.Room*conf.User), avgUsersConsume.String())
 	fmt.Println(info)
 }

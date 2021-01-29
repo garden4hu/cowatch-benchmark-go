@@ -142,4 +142,5 @@ type Config struct {
 	WSTimeOut     int    `json:"websocket_timeout"`
 	StartTimeRoom string `json:"start_time_room"`
 	StartTimeUser string `json:"start_time_user"`
+	Mode          int    `json:"client_mode"`
 }
