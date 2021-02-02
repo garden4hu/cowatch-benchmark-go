@@ -4,10 +4,12 @@
     "user": 3,
     "msg_len": 1024,
     "msg_frequency": 10,
+    "msg_random_send": 0,
     "log_enable": 0,
     "http_timeout": 25,
     "websocket_timeout": 45,
     "start_time_room": "2021-01-29T11:19:00.00+08:00",
     "start_time_user": "2021-01-29T11:19:40.00+08:00",
-    "client_mode":0
+    "client_mode":0,
+    "test_mode":1
 }

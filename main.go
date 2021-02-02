@@ -18,17 +18,18 @@ import (
 )
 
 var config = flag.String("c", "", "[Mandatory] configure: configure file")
-var addr = flag.String("h", "http://localhost:80", "[Mandatory] host: address of coWatch server. schema://host")
-var room = flag.Int("r", 1024, "room size: number of room to create")
-var user = flag.Int("u", 1000, "user size: maximum number of user in room")
-var msgLen = flag.Int("l", 1024, "message length: size of a message")
-var frequency = flag.Int("f", 1000, "frequency: frequency of sending message")
+var addr = flag.String("h", "http://server_host:8080", "[Mandatory] host: address of coWatch server. schema://host")
+var room = flag.Int("r", 10, "room size: number of room to create")
+var user = flag.Int("u", 10, "user size: maximum number of user in room")
+var msgLen = flag.Int("l", 48, "message length: size of a message")
+var frequency = flag.Int("f", 10, "frequency: frequency of sending message")
 var logSwitch = flag.Int("v", 0, "verbose log enable:1, disable(default):0")
 var remoteConfig = flag.String("cr", "", "[Mandatory] remote configure: remote configure. No coexistence with -c")
 var httpReqTimeOut = flag.Int("th", 25, "http timeout(1~60s): http request timeout for create room")
 var wsReqTimeOut = flag.Int("tw", 45, "websocket timeout(1~60s): websocket request timeout for create user")
 var startTimeCreatingRoom = flag.String("rs", "", "[Mandatory] start time for creating room: following RFC3339. For example: 2017-12-08T00:08:00.00+08:00")
 var startTimeCreatingUser = flag.String("us", "", "[Mandatory] start time for creating user: following RFC3339. For example: 2017-12-08T00:08:00.00+08:00")
+var testMode = flag.Int("tm", 1, "[Mandatory] mode for socket requesting server. 0 means parallel, 1 means serial")
 
 func Init() {
 	flag.Parse()
@@ -68,7 +69,7 @@ func main() {
 		}
 		configure = &conf
 	} else {
-		configure = &Config{Host: *addr, Room: *room, User: *user, Len: *msgLen, Freq: *frequency, Log: *logSwitch, HttpTimeOut: *httpReqTimeOut, WSTimeOut: *wsReqTimeOut, StartTimeRoom: *startTimeCreatingRoom, StartTimeUser: *startTimeCreatingUser}
+		configure = &Config{Host: *addr, Room: *room, User: *user, Len: *msgLen, Freq: *frequency, Log: *logSwitch, HttpTimeOut: *httpReqTimeOut, WSTimeOut: *wsReqTimeOut, StartTimeRoom: *startTimeCreatingRoom, StartTimeUser: *startTimeCreatingUser, TestMode: *testMode}
 	}
 	color.Unset()
 
@@ -81,20 +82,13 @@ func main() {
 	// register system interrupt
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
-	if err := getRooms(configure); err != nil {
-		color.Set(color.FgRed)
-		fmt.Println(err)
-		color.Unset()
-		return
-	}
-	if err := getUsers(configure); err != nil {
-		color.Set(color.FgRed)
-		fmt.Println(err)
-		color.Unset()
-		return
+	if configure.TestMode == 0 {
+		go InstanceLoading(configure)
+	} else {
+		go NonInstanceLoading(configure)
 	}
 	// ticker used for get statistics information
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for {
 		// create room
@@ -106,7 +100,7 @@ func main() {
 			return
 		case <-ticker.C:
 			go printLogMessage(roomManager, configure)
-			ticker.Reset(5 * time.Second)
+			ticker.Reset(2 * time.Second)
 			break
 		}
 	}
@@ -137,10 +131,12 @@ type Config struct {
 	User          int    `json:"user"`
 	Len           int    `json:"msg_len"`
 	Freq          int    `json:"msg_frequency"`
+	RandomMsg     int    `json:"msg_random_send"`
 	Log           int    `json:"log_enable"`
 	HttpTimeOut   int    `json:"http_timeout"`
 	WSTimeOut     int    `json:"websocket_timeout"`
 	StartTimeRoom string `json:"start_time_room"`
 	StartTimeUser string `json:"start_time_user"`
 	Mode          int    `json:"client_mode"`
+	TestMode      int    `json:"test_mode"`
 }

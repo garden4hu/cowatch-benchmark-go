@@ -34,7 +34,7 @@ func getRooms(conf *Config) error {
 	if err != nil {
 		return err
 	}
-	if err := rm.RequestRoomsFromServer(when); err != nil {
+	if err := rm.RequestAllRooms(when, 0); err != nil {
 		return err
 	}
 	roomManager = rm
@@ -59,7 +59,7 @@ func getUsers(conf *Config) error {
 		return errors.New("create room manager firstly please, exit now")
 	}
 	for i := 0; i < len(roomManager.Rooms); i++ {
-		go roomManager.Rooms[i].CreateUsers(when)
+		go roomManager.Rooms[i].UsersConnection(when, 0)
 	}
 	return nil
 }

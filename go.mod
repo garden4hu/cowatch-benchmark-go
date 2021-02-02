@@ -4,5 +4,5 @@ go 1.15
 
 require (
 	github.com/fatih/color v1.10.0
-	github.com/garden4hu/cowatchbenchmark v0.1.3
+	github.com/garden4hu/cowatchbenchmark v0.1.4
 )
