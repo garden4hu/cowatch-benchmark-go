@@ -1,21 +1,23 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"github.com/fatih/color"
+	"time"
 )
 
-func InstanceLoading(conf *Config) {
+func getRoomsParallel(conf *Config, ctx context.Context) {
 	if err := getRooms(conf); err != nil {
-		color.Set(color.FgRed)
 		fmt.Println(err)
-		color.Unset()
 		return
 	}
-	if err := getUsers(conf); err != nil {
-		color.Set(color.FgRed)
+	time.Sleep(2 * time.Second)
+	getUsersParallel(conf, ctx)
+}
+
+func getUsersParallel(conf *Config, ctx context.Context) {
+	if err := getUsers(conf, ctx); err != nil {
 		fmt.Println(err)
-		color.Unset()
 		return
 	}
 }

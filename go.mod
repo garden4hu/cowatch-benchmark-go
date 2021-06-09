@@ -1,8 +1,5 @@
 module github.com/garden4hu/cowatch-benchmark-go
 
-go 1.15
+go 1.16
 
-require (
-	github.com/fatih/color v1.10.0
-	github.com/garden4hu/cowatchbenchmark v0.1.4
-)
+require github.com/garden4hu/cowatchbenchmark v0.2.1
