@@ -9,8 +9,8 @@ import (
 )
 
 func getRooms(conf *Config) error {
-	if roomManager == nil {
-		fmt.Println("roomManager == nil, 请先常见 roomManager")
+	if rm == nil {
+		fmt.Println("rm == nil")
 		return errors.New("create roomManager please")
 	}
 	if 0 == conf.Room {
@@ -38,7 +38,7 @@ func getRooms(conf *Config) error {
 	if err != nil {
 		return err
 	}
-	if err := roomManager.RequestAllRooms(when); err != nil {
+	if err := rm.requestAllRooms(when); err != nil {
 		return err
 	}
 	return nil
@@ -60,29 +60,29 @@ func getUsers(conf *Config, ctx context.Context) error {
 		return err
 	}
 
-	if roomManager == nil {
+	if rm == nil {
 		return errors.New("create room manager firstly please, exit now")
 	}
 	ch := make(chan struct{})
 	if conf.ParallelMode == 0 {
-		for i := 0; i < len(roomManager.Rooms); i++ {
-			go roomManager.Rooms[i].UsersConnection(ch, ctx, nil)
+		for i := 0; i < len(rm.Rooms); i++ {
+			go rm.Rooms[i].usersConnection(ch, ctx, nil)
 			time.Sleep(15 * time.Millisecond)
 		}
 	} else if conf.ParallelMode == 1 {
 		var wg sync.WaitGroup // Wait for the websocket handles of all users in the same room to be constructed
-		for i := 0; i < len(roomManager.Rooms); i++ {
+		for i := 0; i < len(rm.Rooms); i++ {
 			wg.Add(1)
-			go roomManager.Rooms[i].UsersConnection(ch, ctx, &wg)
+			go rm.Rooms[i].usersConnection(ch, ctx, &wg)
 			wg.Wait()
 		}
 	} else if conf.ParallelMode == 2 {
 		// 以秒为单位创建ws
 		if conf.User > 0 && conf.WsReqConcurrency >= 0 {
-			for i := 0; i < len(roomManager.Rooms); {
+			for i := 0; i < len(rm.Rooms); {
 				now := time.Now()
-				for j := i; j < i+conf.WsReqConcurrency && j < len(roomManager.Rooms); j++ {
-					go roomManager.Rooms[j].UsersConnection(ch, ctx, nil)
+				for j := i; j < i+conf.WsReqConcurrency && j < len(rm.Rooms); j++ {
+					go rm.Rooms[j].usersConnection(ch, ctx, nil)
 				}
 				i += conf.WsReqConcurrency
 				if 1*time.Second > time.Since(now) {

@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"time"
-
-	cb "github.com/garden4hu/cowatchbenchmark"
 )
 
 type statistic struct {
@@ -12,7 +10,7 @@ type statistic struct {
 	lastSecondRooms int
 }
 
-func printLogMessage(roomManager *cb.RoomManager) {
+func printLogMessage(roomManager *roomManager) {
 	if roomManager == nil {
 		return
 	}
@@ -23,7 +21,7 @@ func printLogMessage(roomManager *cb.RoomManager) {
 	if roomManager.CheckCreatingRoomsOK() == false {
 		roomSize := len(roomManager.Rooms)
 		addedRooms := roomSize - analytics.lastSecondRooms
-		info := fmt.Sprintf("%s [room information] created:%d  wanted:%d  percent:%d%% added:%d time_consumption:%s", now, roomSize, roomManager.RoomSize, roomSize*100/roomManager.RoomSize, addedRooms, roomManager.GetCreatingRoomAvgDuration().String())
+		info := fmt.Sprintf("%s [room information] created:%d  wanted:%d  percent:%d%% added:%d time_consumption:%s", now, roomSize, roomManager.roomSize, roomSize*100/roomManager.roomSize, addedRooms, roomManager.GetCreatingRoomAvgDuration().String())
 		fmt.Println(info)
 		analytics.lastSecondRooms = roomSize
 	}
@@ -33,7 +31,7 @@ func printLogMessage(roomManager *cb.RoomManager) {
 		if addedUsers == 0 {
 			return
 		}
-		total := len(roomManager.Rooms) * roomManager.UserSize
+		total := len(roomManager.Rooms) * roomManager.userSize
 		info := fmt.Sprintf("%s [user information] created:%d  wanted:%d  percent:%d%% new added:%d time_consumption:%s [room=%d]", now, onlineUser, total, onlineUser*100/(total), addedUsers, roomManager.GetCreatingRoomAvgDuration().String(), len(roomManager.Rooms))
 		fmt.Println(info)
 		analytics.lastOnlineUsers = onlineUser

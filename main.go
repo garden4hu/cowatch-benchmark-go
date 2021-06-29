@@ -14,8 +14,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"time"
-
-	cb "github.com/garden4hu/cowatchbenchmark"
 )
 
 var config = flag.String("c", "", "[Mandatory] configure: configure file")
@@ -43,7 +41,7 @@ func Init() {
 	webSocketRunningDuration = time.NewTicker(1 * time.Hour)
 }
 
-var roomManager *cb.RoomManager
+var rm *roomManager
 var onlineUser int
 var analytics *statistic
 var webSocketRunningDuration *time.Ticker
@@ -83,15 +81,15 @@ func main() {
 
 	_, _ = fmt.Fprintf(os.Stdout, "\ninput info:\n server address:\t %s\n number of room:\t %d\n users per room:\t %d\n message length:\t %d\n message frequency:\t %d\n log enable:\t %d\n single client mode: \t %d\n parallel_mode:\t %d\n ws_request_speed_number:\t %d\n ws_online_duration_in_second:\t%d\n\n", configure.Host, configure.Room, configure.User, configure.Len, configure.Freq, configure.Log, configure.SingleClientMode, configure.ParallelMode, configure.WsReqConcurrency, configure.OnlineTime)
 	if configureCheck(configure) != nil {
-		fmt.Println("\n 程序退出")
+		fmt.Println("\n main program exit now.")
 		return
 	}
 	if configure.Log == 0 {
 		log.SetFlags(0)
 		log.SetOutput(ioutil.Discard)
 	}
-	roomManager = cb.NewRoomManager(configure.Host, configure.Room, configure.User, configure.Len, configure.Freq, configure.HttpTimeOut, configure.WSTimeOut, configure.AppID, configure.SingleClientMode, configure.ParallelMode)
-	defer roomManager.Close()
+	rm = newRoomManager(configure.Host, configure.Room, configure.User, configure.Len, configure.Freq, configure.HttpTimeOut, configure.WSTimeOut, configure.AppID, configure.SingleClientMode, configure.ParallelMode)
+	defer rm.Close()
 	// register system interrupt
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
@@ -112,20 +110,20 @@ func main() {
 		// create room
 		select {
 		case <-interrupt:
-			log.Println("interrupt")
+			log.Println("interrupt by user")
 			// Cleanly close the connection by sending a close message and then
 			// waiting (with timeout) for the server to close the connection.
 			return
 		case <-ticker.C:
-			go printLogMessage(roomManager)
+			go printLogMessage(rm)
 			ticker.Reset(1 * time.Second)
 			break
-		case t := <-roomManager.NotifyUserAdd:
+		case t := <-rm.notifyUsersAdd:
 			onlineUser += t
 			break
 		case <-webSocketRunningDuration.C:
 			webSocketRunningDuration.Stop()
-			fmt.Println("程序到时退出")
+			fmt.Println("The program exits at time")
 			return
 		}
 	}
