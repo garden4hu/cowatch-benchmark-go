@@ -1,0 +1,68 @@
+name: Release
+on:
+  release:
+    types: [published, created, edited]
+# mod form https://github.com/v2fly/v2ray-core/blob/master/.github/workflows/release.yml
+jobs:
+  build:
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        # Include amd64 on all platforms.
+        goos: [windows, linux, darwin]
+        goarch: [amd64]
+      fail-fast: false
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      CGO_ENABLED: 0
+    steps:
+      - name: Checkout codebase
+        uses: actions/checkout@v2
+
+      - name: Show workflow information
+        id: get_filename
+        run: |
+          export _NAME=$GOOS-$GOARCH
+          echo "GOOS: $GOOS, GOARCH: $GOARCH, RELEASE_NAME: $_NAME"
+          echo "ASSET_NAME=$_NAME" >> $GITHUB_ENV
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.16
+
+      - name: Get project and dependencies
+        run: |
+          go mod download
+          go mod tidy
+
+      - name: Build
+        run: |
+          echo "building on going..., ASSET_NAME is ${ASSET_NAME}"
+          go build -v -o build/${{env.ASSET_NAME}} ./
+
+      - name: uplaod output binrary to Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{env.ASSET_NAME}}
+          path: build/${{env.ASSET_NAME}}
+          
+      - name: Upload binaries to release Linux/Macos
+        if: matrix.goos != 'windows'
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/${{env.ASSET_NAME}}
+          asset_name: ${{env.ASSET_NAME}}
+          tag: ${{ github.ref }}
+          overwrite: true
+      
+      - name: Upload binaries to release Windows
+        if: matrix.goos == 'windows'
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/${{env.ASSET_NAME}}
+          asset_name: ${{env.ASSET_NAME}}.exe
+          tag: ${{ github.ref }}
+          overwrite: true
