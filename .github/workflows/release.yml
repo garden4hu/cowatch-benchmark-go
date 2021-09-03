@@ -1,0 +1,62 @@
+name: Release
+on:
+  release:
+    types: [published, created]
+# mod form https://github.com/v2fly/v2ray-core/blob/master/.github/workflows/release.yml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Include amd64 on all platforms.
+        goos: [windows, linux, darwin]
+        goarch: [amd64]
+      fail-fast: false
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      CGO_ENABLED: 0
+    steps:
+      - name: Checkout codebase
+        uses: actions/checkout@v2
+
+      - name: Show workflow information
+        id: get_filename
+        run: |
+          export _NAME=$GOOS-$GOARCH$GOARM
+          echo "GOOS: $GOOS, GOARCH: $GOARCH, GOARM: $GOARM, RELEASE_NAME: $_NAME"
+          echo "::set-output name=ASSET_NAME::$_NAME"
+          echo "ASSET_NAME=$_NAME" >> $GITHUB_ENV
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.16
+
+      - name: Get project dependencies
+        run: go mod download
+
+      - name: Build
+        run: |
+          echo "building on going..."
+          go build -v -o build/${_NAME} ./
+      - name: Build Windows
+        if: matrix.goos == 'windows'
+        run : | 
+          pushd build/ || exit 1
+          mv ${_NAME} ${_NAME}.exe
+          popd
+      - name: uplaod output binrary to Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${_NAME}
+          path: build/${_NAME}
+          
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/${_NAME}
+          asset_name: ${_NAME}
+          tag: ${{ github.ref }}
+          overwrite: true
+          
