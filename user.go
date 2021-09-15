@@ -14,7 +14,7 @@ import (
 
 // newUser construct the user
 func newUser() *userInfo {
-	return &userInfo{name: generateUserName(4), uid: getHostId(), hostCoWatch: false, connected: false, readyForMsg: false}
+	return &userInfo{name: generateUserName(8), uid: getHostId(), hostCoWatch: false, connected: false, readyForMsg: false}
 }
 
 // usersConnection try to connect to the server and exchange message.
@@ -52,8 +52,9 @@ func (p *userInfo) joinRoom(r *roomUnit, parallel bool, ctx context.Context, sta
 		v.Add("name", p.name)
 		v.Add("version", r.sdkVersion)
 		v.Add("roomId", r.roomName)
-		v.Add("EIO", "3")
+		v.Add("EIO", "4") // using socket.io V4
 		v.Add("transport", "websocket")
+		v.Add("hostname", "co-test-golang") // add host name
 		u := url.URL{Host: r.address, Path: "/socket.io/", ForceQuery: true, RawQuery: v.Encode()}
 		switch r.schema {
 		case "http":

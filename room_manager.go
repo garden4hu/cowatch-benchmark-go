@@ -31,6 +31,7 @@ type roomManager struct {
 	creatingUsersOK          bool
 	finishedReqRoomRoutines  int
 	finishedReqUsersRoutines int
+	createRoomExtraField     map[string]string
 }
 
 // newRoomManager will return a roomManager

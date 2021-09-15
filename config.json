@@ -14,5 +14,13 @@
     "parallel_mode": 2,
     "app_id": "abcdefghijklmn",
     "ws_request_speed_number": 100,
-    "ws_online_duration_in_second": 3
+    "ws_online_duration_in_second": 3,
+    "createRoomExtraField": {
+      "expireTime": 5,
+      "hostname": "co-test-golang",
+      "maxMember": 4,
+      "roomRole": "room_valid_until_expired",
+      "hostLeaveRole": "host_transfer_to_second_after_host_leave",
+      "ownerBackRole": "host_return_after_owner_back"
+    }
 }

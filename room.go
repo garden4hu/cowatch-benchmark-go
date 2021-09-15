@@ -53,12 +53,23 @@ func (p *roomUnit) request() error {
 	}()
 	// p.preRequest()
 	start := time.Now()
-	// construct body
+
 	roomId := getHostId()
-	body := generateCreatingRoomReqBody(CreateRoomReqBody{HostUid: roomId, AppID: p.appId, ExpireTime: p.expireTime, Version: p.sdkVersion})
-	req, _ := http.NewRequest("POST", uri, bytes.NewBufferString(body))
+	// construct post body json
+	bd := rm.createRoomExtraField
+	if bd == nil {
+		bd = make(map[string]string)
+	}
+	bd["hostUid"] = fmt.Sprintf("%d", getHostId())
+	bd["appid"] = p.appId
+	bd["version"] = p.sdkVersion
+	s, e := json.Marshal(bd)
+	if e != nil {
+		return e
+	}
+	req, _ := http.NewRequest("POST", uri, bytes.NewBuffer(s))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("content-length", fmt.Sprintf("%d", len(body)))
+	req.Header.Set("content-length", fmt.Sprintf("%d", len(s)))
 	req.Header.Set("userInfo-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36 Edg/90.0.818.56")
 	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
 	req.Header.Set("accept", "*/*")
@@ -92,7 +103,7 @@ func (p *roomUnit) request() error {
 	p.roomId = roomId
 
 	// Note: 房间创建完成后，即产生第一个 userInfo， 也是 Host
-	p.users = append(p.users, &userInfo{name: generateUserName(4), hostCoWatch: true, uid: roomId, connected: false, readyForMsg: false})
+	p.users = append(p.users, &userInfo{name: generateUserName(8), hostCoWatch: true, uid: roomId, connected: false, readyForMsg: false})
 
 	// add room to rm
 	p.rm.lockRoom.Lock()
@@ -102,16 +113,10 @@ func (p *roomUnit) request() error {
 }
 
 type CreateRoomReqBody struct {
-	AppID      string `json:"appId"`
-	ExpireTime int    `json:"expireTime"`
-	HostUid    int    `json:"hostUid"`
-	Version    string `json:"version"`
-}
-
-// generateCreatingRoomReqBody return a string of json
-func generateCreatingRoomReqBody(body CreateRoomReqBody) string {
-	str, _ := json.Marshal(body)
-	return string(str)
+	appID      string
+	expireTime int
+	hostUid    int
+	version    string
 }
 
 // preRequest is used for fetch method.

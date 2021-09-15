@@ -89,6 +89,7 @@ func main() {
 		log.SetOutput(ioutil.Discard)
 	}
 	rm = newRoomManager(configure.Host, configure.Room, configure.User, configure.Len, configure.Freq, configure.HttpTimeOut, configure.WSTimeOut, configure.AppID, configure.SingleClientMode, configure.ParallelMode)
+	processExtraHeader(rm, configure)
 	defer rm.Close()
 	// register system interrupt
 	interrupt := make(chan os.Signal, 1)
@@ -194,21 +195,41 @@ func configureCheck(conf *Config) error {
 	}
 }
 
+func processExtraHeader(rm *roomManager, conf *Config) {
+	if rm == nil || conf == nil {
+		return
+	}
+	c := conf.CreateRoomExtraField.(map[string]interface{})
+
+	rm.createRoomExtraField = make(map[string]string)
+
+	for k, v := range c {
+		switch v.(type) {
+		case string:
+			rm.createRoomExtraField[k] = v.(string)
+		case float64:
+			rm.createRoomExtraField[k] = fmt.Sprintf("%f", v.(float64))
+		default:
+		}
+	}
+}
+
 type Config struct {
-	Host             string `json:"host"`
-	Room             int    `json:"room"`
-	User             int    `json:"user"`
-	Len              int    `json:"msg_len"`
-	Freq             int    `json:"msg_frequency"`
-	RandomMsg        int    `json:"msg_random_send"`
-	Log              int    `json:"log_enable"`
-	AppID            string `json:"app_id"`
-	HttpTimeOut      int    `json:"http_timeout"`
-	WSTimeOut        int    `json:"websocket_timeout"`
-	StartTimeRoom    string `json:"start_time_room"`
-	StartTimeUser    string `json:"start_time_user"`
-	SingleClientMode int    `json:"single_client_mode"`
-	ParallelMode     int    `json:"parallel_mode"`
-	WsReqConcurrency int    `json:"ws_request_speed_number"`
-	OnlineTime       int    `json:"ws_online_duration_in_second"`
+	Host                 string      `json:"host"`
+	Room                 int         `json:"room"`
+	User                 int         `json:"user"`
+	Len                  int         `json:"msg_len"`
+	Freq                 int         `json:"msg_frequency"`
+	RandomMsg            int         `json:"msg_random_send"`
+	Log                  int         `json:"log_enable"`
+	AppID                string      `json:"app_id"`
+	HttpTimeOut          int         `json:"http_timeout"`
+	WSTimeOut            int         `json:"websocket_timeout"`
+	StartTimeRoom        string      `json:"start_time_room"`
+	StartTimeUser        string      `json:"start_time_user"`
+	SingleClientMode     int         `json:"single_client_mode"`
+	ParallelMode         int         `json:"parallel_mode"`
+	WsReqConcurrency     int         `json:"ws_request_speed_number"`
+	OnlineTime           int         `json:"ws_online_duration_in_second"`
+	CreateRoomExtraField interface{} `json:"createRoomExtraField"`
 }
