@@ -2,6 +2,7 @@
 CoWatchBenchmark-go is a tool written by [Go](http://golang.org/) for benchmarking the performance of the cowatch server. 
 
 [中文](./README_CN.md)
+
 ## Arguments
 
 CoWatchBenchmark-go supports the following commands:
@@ -49,21 +50,23 @@ CoWatchBenchmark-go supports the following commands:
 The configure file is json style. The full content of the configure file as follow:
 
 ```json
-    "host": "http://server_host:80",
-    "room": 2,
-    "user": 10,
-    "msg_len": 1024,
-    "msg_frequency": 10,
-    "log_enable": 0,
-    "http_timeout": 25,
-    "websocket_timeout": 45,
-    "start_time_room": "2021-01-20T21:34:00.00+08:00",
-    "start_time_user": "2021-01-20T21:35:00.00+08:00",
-    "single_client_mode": 1,
-    "parallel_mode": 2,
-    "app_id": "8dad41adda7a4d939aa1aae8484c3981",
-    "ws_request_speed_number": 100,
-    "ws_online_duration_in_second": 1200
+{
+  "host": "http://server_host:80",
+  "room": 2,
+  "user": 10,
+  "msg_len": 1024,
+  "msg_frequency": 10,
+  "log_enable": 0,
+  "http_timeout": 25,
+  "websocket_timeout": 45,
+  "start_time_room": "2021-01-20T21:34:00.00+08:00",
+  "start_time_user": "2021-01-20T21:35:00.00+08:00",
+  "single_client_mode": 1,
+  "parallel_mode": 2,
+  "app_id": "8dad41adda7a4d939aa1aae8484c3981",
+  "ws_request_speed_number": 100,
+  "ws_online_duration_in_second": 1200
+}
 ```
 
 **Configure file mode will override other arguments**
@@ -85,6 +88,9 @@ CoWatchBenchmark-go can also be started with a remote configure file. It's very 
 Using remote configure file can be start this program parallel in different client by setting the field `start_time_room` and `start_time_user`.
 
     Note: `start_time_user` should be after `start_time_room`. The time difference shouldn't be less then 60s.
+
+## Extra parameter of creating room
+There is a `createRoomExtraField` field in the config file. It supports adding extra data to the body of HTTP requesting. **You should not add an array or an object into the createRoomExtraField object. That is to say, only string and number are supporting.**
 
 ## Cammond line arguements mode
 Refer to Arguments block

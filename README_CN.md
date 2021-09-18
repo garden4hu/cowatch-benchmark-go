@@ -47,21 +47,23 @@ CoWatchBenchmark-go 支持 命令行参数启动:
 配置文件为 Json 格式，一个例子:
 
 ```json
-    "host": "http://server_host:80",
-    "room": 2,
-    "user": 10,
-    "msg_len": 1024,
-    "msg_frequency": 10,
-    "log_enable": 0,
-    "http_timeout": 25,
-    "websocket_timeout": 45,
-    "start_time_room": "2021-01-20T21:34:00.00+08:00",
-    "start_time_user": "2021-01-20T21:35:00.00+08:00",
-    "single_client_mode": 1,
-    "parallel_mode": 2,
-    "app_id": "8dad41adda7a4d939aa1aae8484c3981",
-    "ws_request_speed_number": 100,
-    "ws_online_duration_in_second": 1200
+{
+  "host": "http://server_host:80",
+  "room": 2,
+  "user": 10,
+  "msg_len": 1024,
+  "msg_frequency": 10,
+  "log_enable": 0,
+  "http_timeout": 25,
+  "websocket_timeout": 45,
+  "start_time_room": "2021-01-20T21:34:00.00+08:00",
+  "start_time_user": "2021-01-20T21:35:00.00+08:00",
+  "single_client_mode": 1,
+  "parallel_mode": 2,
+  "app_id": "8dad41adda7a4d939aa1aae8484c3981",
+  "ws_request_speed_number": 100,
+  "ws_online_duration_in_second": 1200
+}
 ```
 注意：配置文件具有较高的优先级（ 即不要 CLI 和 配置文件混合使用 ）。下面的举例中使用 `CoWatchBenchmark` 作为可执行程序的名称。
 
@@ -101,6 +103,8 @@ CoWatchBenchmark-go 支持 命令行参数启动:
 ./CoWatchBenchmark -host "https://server_host:port" -rtcID "abcdefgh" -standalone 1 -parallel 2 -wsCon 50
 ```
 
+## 创建房间的 HTTP 请求结构体中，添加自定义字段
+在配置文件中有一个 `createRoomExtraField` 字段，这个字段可以为 POST 的 JSON 结构体中添加自定义的字段。 **注意，字段仅支持 string 和数字，数组和对象会被忽略掉**
 
 ### FAQ
 

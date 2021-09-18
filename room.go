@@ -56,9 +56,9 @@ func (p *roomUnit) request() error {
 
 	roomId := getHostId()
 	// construct post body json
-	bd := rm.createRoomExtraField
-	if bd == nil {
-		bd = make(map[string]string)
+	bd := make(map[string]string)
+	for k, v := range rm.createRoomExtraField {
+		bd[k] = v
 	}
 	bd["hostUid"] = fmt.Sprintf("%d", getHostId())
 	bd["appid"] = p.appId
