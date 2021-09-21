@@ -12,7 +12,7 @@ func getRooms(ctx context.Context, conf *Config) error {
 
 		return errors.New("create roomManager please")
 	}
-	if 0 == conf.Room {
+	if 0 == conf.Rooms {
 		return nil
 	}
 
@@ -77,7 +77,7 @@ func getUsers(conf *Config, ctx context.Context) error {
 		}
 	} else if conf.ParallelMode == 2 {
 		// 以秒为单位创建ws
-		if conf.User > 0 && conf.WsReqConcurrency >= 0 {
+		if conf.UsersPerRoom > 0 && conf.WsReqConcurrency >= 0 {
 			for i := 0; i < len(rm.Rooms); {
 				now := time.Now()
 				for j := i; j < i+conf.WsReqConcurrency && j < len(rm.Rooms); j++ {

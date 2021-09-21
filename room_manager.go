@@ -38,23 +38,10 @@ type roomManager struct {
 
 // newRoomManager will return a roomManager
 func newRoomManager(conf *Config) *roomManager {
-	if conf.Room < 0 || conf.User < 0 || conf.Freq <= 0 {
-		log.Fatalln("Invalid param")
-		return nil
-	}
-	if conf.HttpTimeOut > 60 || conf.HttpTimeOut < 0 {
-		conf.HttpTimeOut = 60
-	}
-	if conf.WSTimeOut > 60 || conf.WSTimeOut < 0 {
-		conf.WSTimeOut = 45
-	}
-	if conf.Freq <= 0 {
-		conf.Freq = 1
-	}
-	rm := &roomManager{addr: conf.Host, roomSize: conf.Room, userSize: conf.User, messageLength: conf.Len, frequency: conf.Freq, start: false, httpTimeout: time.Second * time.Duration(conf.HttpTimeOut), websocketTimeout: time.Second * time.Duration(conf.WSTimeOut), appID: conf.AppID, singleClientMode: conf.SingleClientMode, parallelRequest: conf.ParallelMode == 1, sdkVersion: conf.SDKVersion}
+	rm := &roomManager{addr: conf.Address, roomSize: conf.Rooms, userSize: conf.UsersPerRoom, messageLength: conf.Len, frequency: conf.Freq, start: false, httpTimeout: time.Second * time.Duration(conf.HttpTimeOut), websocketTimeout: time.Second * time.Duration(conf.WSTimeOut), appID: conf.AppID, singleClientMode: conf.SingleClientMode, parallelRequest: conf.ParallelMode == 1, sdkVersion: conf.SDKVersion}
 	rm.creatingRoomsOK = false
 	rm.creatingUsersOK = false
-	rm.notifyUserAdd = make(chan int, conf.Room*conf.User)
+	rm.notifyUserAdd = make(chan int, conf.Rooms*conf.UsersPerRoom)
 	rm.notifyUsersAdd = rm.notifyUserAdd
 	rm.finishedReqRoomRoutines = 0
 	rm.finishedReqUsersRoutines = 0

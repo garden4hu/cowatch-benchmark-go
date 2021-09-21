@@ -6,45 +6,17 @@ CoWatchBenchmark-go 由 [Golang](http://golang.org/) 写出，为了测试 Cowat
 CoWatchBenchmark-go 支持 命令行参数启动:
 
 ```txt
-  -c string
-        [强制] configure: 本地配置文件
+   -c string
+        [Mandatory] 本地配置文件
   -cr string
-        [强制] remote configure: 远程配置文件，应为一个 Internet 资源
-  -host string
-        [强制] host: address of coWatch server. schema://host
-  -httpTimeout int
-        http timeout(1~60s): http request timeout for create room (default 25)
-  -msgFreq int
-        frequency: frequency of sending message per minute (default 10)
-  -msglen int
-        message length: size of a message (default 48)
-  -parallel int
-        [强制] mode for socket requesting server.1 代表并发请求, 0 代表串行请求, 2 代表 批量请求（既每次并发放请求一定数目，该过程则是顺序的） (default 1)
-  -parallelStartTimeRoom string
-        [强制] 开始创建房间的时间 (值为空或不设置代表立刻启动): RFC3339 格式. For example: 2017-12-08T00:08:00.00+08:00
-  -parallelStartTimeUser string
-        [强制] 开始创建用户的时间 (值为空或不设置代表立刻启动): RFC3339 格式. For example: 2017-12-08T00:08:00.00+08:00
-  -room int
-        room size: 要创建的房间数量 (default 10)
-  -rtcID string
-        [强制] webrtc app id
-  -standalone int
-        [强制] 为 1 则表示单点运行该程序。0 则表示在多点运行程序（可以理解为分布式） (default 1)
-  -user int
-        user size: 每个房间的用户数目 (default 10)
-  -v int
-        verbose log enable:1, disable(default):0
-  -websocketTimeout int
-        websocket timeout(1~60s): websocket request timeout for create user (default 45)
-  -wsCon int
-        仅用于 parallel = 2 的情况下，表示每批次有多少房间的用户请求加入房间 (default 1)
-  -wsOnlineDuration int
-        当所有用户都加入房间后，用户通信时间，到时退出。单位为秒(s) (default 300)
+        [Mandatory] 远程配置文件，和本地配置文件不能同时使用
+  -v
+        [optional] 显示更多输出
 ```
 
 ## 配置文件模式
 
-配置文件为 Json 格式，一个例子:
+配置文件为 Json 格式，形如下:
 
 ```json
 {
@@ -65,6 +37,30 @@ CoWatchBenchmark-go 支持 命令行参数启动:
   "ws_online_duration_in_second": 1200
 }
 ```
+
+### parameter instruction
+
+| 项 | 类型 | 默认值 | 强制 * | 说明 |
+| --- | :---: | :---:  | :---: |--- |
+| host | string |  | Y |  服务器地址 schema://address |
+| rooms | uint |  1 | N | 要创建的房间数目 |
+| users_per_room | uint |  1 | N |  每房间用户数目 |
+| message_frequency | uint | 10/m | N |  每分钟发送消息频率 |
+| message_length | uint | 48 (bytes) | N |  消息的长度  |
+| http_request_timeout  | uint | 25(s) | N |   http 超时时长  |
+| websocket_request_timeout | uint | 25(s) | N | websocket 超时时长 | 
+| parallel_mode | uint | 0 | N | 请求服务器的方式 <br>0 顺序请求 <br>1 并发请求  <br>2 批量请求 |
+| start_time_for_create_rooms | string |   | O |  只用于并发请求, 举例： "2021-05-13T13:49:00.00+08:00" |
+| start_time_for_create_users | string |   | O |  只用于并发请求, 举例： "2021-05-13T13:50:00.00+08:00" |
+| single_client_mode | uint | 1 | N | 只用于单点测试 |
+| app_id | string |  | Y | rtc token  |
+| ws_request_speed_number_for_mode_2 | int | | O | 每批次（并发）请求的数目 |
+| room_expiration_time_in_second | uint | 300s | Y | WS 在线时长 |
+| sdk_version | string |  | Y | the sdk version |
+| createRoomExtraData | json | | Y | 创建房间时 http post 的消息体可以增加的自定义参数。<br>注意，可以不添加任何参数，tag 必须存在 |
+| http_header | json | | Y  | 自定义的 http header <br>注意，可以不添加任何参数，tag 必须存在 |
+
+* O 表示可选，但是其依赖于其他参数。
 注意：配置文件具有较高的优先级（ 即不要 CLI 和 配置文件混合使用 ）。下面的举例中使用 `CoWatchBenchmark` 作为可执行程序的名称。
 
 ### 本地配置文件
@@ -104,10 +100,10 @@ CoWatchBenchmark-go 支持 命令行参数启动:
 ```
 
 ## 创建房间的 HTTP 请求结构体中，添加自定义字段
-在配置文件中有一个 `createRoomExtraField` 字段，这个字段可以为 POST 的 JSON 结构体中添加自定义的字段。 **注意，字段仅支持 string 和数字，数组和对象会被忽略掉**
+在配置文件中有一个 `createRoomExtraData` 字段，这个字段可以为 POST 的 JSON 结构体中添加自定义的字段。 **注意，字段仅支持 string 和数字，数组和对象会被忽略掉**
 
 ### FAQ
 
 1. 参数中关于时间的参数主要用于多点启动，单点程序不用设置关于开始时间的参数。
 2. 终端中输出的用户在线数目是实时的，当用户掉线的时候，log 会输出相关的信息。
-3. wsCon 参数需要 parallel=2 来配合
+3. ws_request_speed_number_for_mode_2 参数需要 parallel=2 来配合

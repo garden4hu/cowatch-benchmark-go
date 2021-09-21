@@ -17,10 +17,7 @@ import (
 
 // newRoom return a roomUnit object
 func newRoom(host string, httpTimeout, wsTimeout time.Duration, maximumUsers, msgLength, frequency int, appId string, rm *roomManager) *roomUnit {
-	if frequency == 0 {
-		frequency = 10
-	}
-	room := &roomUnit{usersCap: maximumUsers, msgLength: msgLength, msgSendingInternal: time.Microsecond * time.Duration(60*1000*1000/frequency), appId: appId, rm: rm}
+	room := &roomUnit{usersCap: maximumUsers, msgLength: msgLength, msgSendingInternal: time.Millisecond * time.Duration(frequency), appId: appId, rm: rm}
 	ur, _ := url.Parse(host)
 	room.schema = ur.Scheme
 	room.address = ur.Host
@@ -109,7 +106,7 @@ func (p *roomUnit) request(ctx context.Context) error {
 		"namespace": room.Name,
 		"roomId":    roomId,
 	}).Debugln("created room ok")
-	// Note: 房间创建完成后，即产生第一个 userInfo， 也是 Host
+	// Note: 房间创建完成后，即产生第一个 userInfo， 也是 Address
 	p.users = append(p.users, &userInfo{name: generateUserName(8), hostCoWatch: true, uid: roomId, connected: false, readyForMsg: false, expireTimer: time.NewTicker(24 * time.Hour)})
 
 	// add room to rm

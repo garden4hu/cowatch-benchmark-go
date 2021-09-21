@@ -103,7 +103,7 @@ func main() {
 		log.Infoln("your configure is :\n", string(indent))
 	}
 
-	if e := configureCheck(configure); e != nil {
+	if e := checkConfigure(configure); e != nil {
 		log.Errorln(e.Error())
 		return
 	}
@@ -168,7 +168,7 @@ func readConfigure(path string) (*Config, error) {
 	return &conf, nil
 }
 
-func configureCheck(conf *Config) (e error) {
+func checkConfigure(conf *Config) (e error) {
 	checkTime := func(tim string) (err error) {
 		_, err = time.Parse(time.RFC3339, tim)
 		if err != nil {
@@ -176,26 +176,30 @@ func configureCheck(conf *Config) (e error) {
 		}
 		return err
 	}
-	if conf.Host == "" {
-		e = errors.New("[ERROR] Host invalid")
-	} else if conf.Room <= 0 {
-		e = errors.New("[ERROR] number of room is invalid")
-	} else if conf.User <= 0 {
-		e = errors.New("[ERROR] number of users per room is invalid")
+	if conf.Address == "" {
+		e = errors.New("[ERROR] Address invalid")
+	} else if conf.Rooms <= 0 {
+		conf.Rooms = 1
+	} else if conf.UsersPerRoom <= 0 {
+		conf.UsersPerRoom = 1
 	} else if conf.Freq <= 0 {
-		e = errors.New("[ERROR] number of users per room is invalid, should be positive")
+		conf.Freq = 10
+	} else if (60*1000)/conf.Freq < 1 {
+		conf.Freq = 10
 	} else if conf.SingleClientMode < 0 || conf.SingleClientMode > 1 {
-		e = errors.New("[ERROR] single_client_mode is invalid, should be 0 or 1")
+		conf.SingleClientMode = 1
 	} else if conf.ParallelMode < 0 || conf.ParallelMode > 2 {
-		e = errors.New("[ERROR] parallel_mode is invalid, should be 0, 1, 2")
+		conf.ParallelMode = 0
 	} else if conf.WsReqConcurrency <= 0 {
-		e = errors.New("[ERROR] ws_request_speed_number is invalid, should be positive")
+		conf.WsReqConcurrency = 1
 	} else if conf.StartTimeRoom != "" {
 		e = checkTime(conf.StartTimeRoom)
 	} else if conf.StartTimeUser != "" {
 		e = checkTime(conf.StartTimeUser)
 	} else if conf.ParallelMode == 2 && conf.OnlineTime <= 0 {
-		e = errors.New("[ERROR] ws_online_duration_in_second is invalid, should be positive")
+		conf.OnlineTime = 300
+	} else if conf.AppID == "" {
+		e = errors.New("invalid app_id")
 	}
 	return e
 }
@@ -230,23 +234,21 @@ func processExtraHttpData(rm *roomManager, conf *Config) {
 }
 
 type Config struct {
-	Host                string      `json:"host"`
-	Room                int         `json:"room"`
-	User                int         `json:"user"`
-	Len                 int         `json:"msg_len"`
-	Freq                int         `json:"msg_frequency"`
-	RandomMsg           int         `json:"msg_random_send"`
-	LogOutput           string      `json:"log_output"`
+	Address             string      `json:"address"`
+	Rooms               int         `json:"rooms"`
+	UsersPerRoom        int         `json:"users_per_room"`
+	Len                 int         `json:"message_length"`
+	Freq                int         `json:"message_frequency"`
 	AppID               string      `json:"app_id"`
-	HttpTimeOut         int         `json:"http_timeout"`
-	WSTimeOut           int         `json:"websocket_timeout"`
-	StartTimeRoom       string      `json:"start_time_room"`
-	StartTimeUser       string      `json:"start_time_user"`
+	HttpTimeOut         int         `json:"http_request_timeout"`
+	WSTimeOut           int         `json:"websocket_request_timeout"`
+	StartTimeRoom       string      `json:"start_time_for_create_rooms"`
+	StartTimeUser       string      `json:"start_time_for_create_users"`
 	SingleClientMode    int         `json:"single_client_mode"`
 	ParallelMode        int         `json:"parallel_mode"`
-	WsReqConcurrency    int         `json:"ws_request_speed_number"`
-	OnlineTime          int         `json:"room_expiration_time"`
+	WsReqConcurrency    int         `json:"ws_request_speed_number_for_mode_2"`
+	OnlineTime          int         `json:"room_expiration_time_in_second"`
 	SDKVersion          string      `json:"sdk_version"`
-	CreateRoomExtraData interface{} `json:"CreateRoomExtraData"` // the extra data which post to the server
+	CreateRoomExtraData interface{} `json:"createRoomExtraData"` // the extra data which post to the server
 	HttpHeaderExtra     interface{} `json:"http_header"`
 }
