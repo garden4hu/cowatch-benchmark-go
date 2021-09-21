@@ -3,14 +3,13 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 )
 
-func getRooms(conf *Config) error {
+func getRooms(ctx context.Context, conf *Config) error {
 	if rm == nil {
-		fmt.Println("rm == nil")
+
 		return errors.New("create roomManager please")
 	}
 	if 0 == conf.Room {
@@ -38,7 +37,7 @@ func getRooms(conf *Config) error {
 	if err != nil {
 		return err
 	}
-	if err := rm.requestAllRooms(when); err != nil {
+	if err := rm.requestAllRooms(ctx, when); err != nil {
 		return err
 	}
 	return nil

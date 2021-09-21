@@ -2,13 +2,12 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
 func getRoomsParallel(conf *Config, ctx context.Context) {
-	if err := getRooms(conf); err != nil {
-		fmt.Println(err)
+	if err := getRooms(ctx, conf); err != nil {
+		log.Errorln(err.Error())
 		return
 	}
 	time.Sleep(2 * time.Second)
@@ -17,7 +16,7 @@ func getRoomsParallel(conf *Config, ctx context.Context) {
 
 func getUsersParallel(conf *Config, ctx context.Context) {
 	if err := getUsers(conf, ctx); err != nil {
-		fmt.Println(err)
+		log.Infoln(err)
 		return
 	}
 }

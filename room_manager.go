@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"errors"
-	"log"
 	"sync"
 	"time"
 )
@@ -23,6 +23,7 @@ type roomManager struct {
 	appID            string
 	singleClientMode int
 	parallelRequest  bool
+	sdkVersion       string
 	notifyUsersAdd   <-chan int // chan 大小为 用户总数
 
 	// for internal usage
@@ -31,28 +32,29 @@ type roomManager struct {
 	creatingUsersOK          bool
 	finishedReqRoomRoutines  int
 	finishedReqUsersRoutines int
-	createRoomExtraField     map[string]string
+	createRoomExtraData      map[string]string
+	httpHeaders              map[string]string
 }
 
 // newRoomManager will return a roomManager
-func newRoomManager(addr string, room, user, msgLen, frequency, httpTimeout, webSocketTimeout int, appID string, singleClientMode int, parallel int) *roomManager {
-	if room < 0 || user < 0 || frequency <= 0 {
+func newRoomManager(conf *Config) *roomManager {
+	if conf.Room < 0 || conf.User < 0 || conf.Freq <= 0 {
 		log.Fatalln("Invalid param")
 		return nil
 	}
-	if httpTimeout > 60 || httpTimeout < 0 {
-		httpTimeout = 60
+	if conf.HttpTimeOut > 60 || conf.HttpTimeOut < 0 {
+		conf.HttpTimeOut = 60
 	}
-	if webSocketTimeout > 60 || webSocketTimeout < 0 {
-		webSocketTimeout = 45
+	if conf.WSTimeOut > 60 || conf.WSTimeOut < 0 {
+		conf.WSTimeOut = 45
 	}
-	if frequency <= 0 {
-		frequency = 1
+	if conf.Freq <= 0 {
+		conf.Freq = 1
 	}
-	rm := &roomManager{addr: addr, roomSize: room, userSize: user, messageLength: msgLen, frequency: frequency, start: false, httpTimeout: time.Second * time.Duration(httpTimeout), websocketTimeout: time.Second * time.Duration(webSocketTimeout), appID: appID, singleClientMode: singleClientMode, parallelRequest: parallel == 1}
+	rm := &roomManager{addr: conf.Host, roomSize: conf.Room, userSize: conf.User, messageLength: conf.Len, frequency: conf.Freq, start: false, httpTimeout: time.Second * time.Duration(conf.HttpTimeOut), websocketTimeout: time.Second * time.Duration(conf.WSTimeOut), appID: conf.AppID, singleClientMode: conf.SingleClientMode, parallelRequest: conf.ParallelMode == 1, sdkVersion: conf.SDKVersion}
 	rm.creatingRoomsOK = false
 	rm.creatingUsersOK = false
-	rm.notifyUserAdd = make(chan int, room*user)
+	rm.notifyUserAdd = make(chan int, conf.Room*conf.User)
 	rm.notifyUsersAdd = rm.notifyUserAdd
 	rm.finishedReqRoomRoutines = 0
 	rm.finishedReqUsersRoutines = 0
@@ -74,7 +76,7 @@ func (p *roomManager) CheckCreatingUsersOK() bool {
 // requestAllRooms will request all the roomSize from the server.
 // param when is the start time for request room from server concurrently [Only useful when parallel is true]
 // param mode is the mode for request room. true means parallel and false means serial
-func (p *roomManager) requestAllRooms(when time.Time) error {
+func (p *roomManager) requestAllRooms(ctx context.Context, when time.Time) error {
 	var wg sync.WaitGroup
 	start := make(chan struct{})
 
@@ -86,7 +88,7 @@ func (p *roomManager) requestAllRooms(when time.Time) error {
 		// all goroutines will send request in the same time
 		if p.parallelRequest == true {
 			wg.Add(1)
-			go p.requestRoom(&wg, start)
+			go p.requestRoom(ctx, &wg, start)
 			i++
 		} else {
 			//  线程创建，为了提高速度，一次创建 8 个
@@ -94,7 +96,7 @@ func (p *roomManager) requestAllRooms(when time.Time) error {
 				// go p.RequestRoom()
 				go func() {
 					r := newRoom(p.addr, p.httpTimeout, p.websocketTimeout, p.userSize, p.messageLength, p.frequency, p.appID, p)
-					_ = r.request()
+					_ = r.request(ctx)
 					mtx.Lock()
 					leftGoroutine -= 1
 					mtx.Unlock()
@@ -127,7 +129,7 @@ func (p *roomManager) requestAllRooms(when time.Time) error {
 	return nil
 }
 
-func (p *roomManager) requestRoom(wg *sync.WaitGroup, start chan struct{}) {
+func (p *roomManager) requestRoom(ctx context.Context, wg *sync.WaitGroup, start chan struct{}) {
 	r := newRoom(p.addr, p.httpTimeout, p.websocketTimeout, p.userSize, p.messageLength, p.frequency, p.appID, p)
 	if wg != nil {
 		defer wg.Done()
@@ -135,5 +137,5 @@ func (p *roomManager) requestRoom(wg *sync.WaitGroup, start chan struct{}) {
 	if p.parallelRequest {
 		<-start // 需要等待
 	}
-	_ = r.request()
+	_ = r.request(ctx)
 }

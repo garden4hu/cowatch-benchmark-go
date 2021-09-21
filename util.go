@@ -42,9 +42,3 @@ func getHostId() int {
 func generateUserName(length int) string {
 	return randStringBytes(length)
 }
-
-// generateMessage generate text message randomly for user
-func generateMessage(r *roomUnit) []byte {
-	msg := "42/" + r.roomName + ",[\"CMD:chat\",\"" + randStringBytes(r.msgLength) + "\"]"
-	return []byte(msg)
-}

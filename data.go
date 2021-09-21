@@ -8,7 +8,7 @@ import (
 type roomUnit struct {
 	address      string        // server+port
 	schema       string        // http(s)
-	roomName     string        // room name
+	ns           string        // room name
 	roomId       int           // room ID
 	password     string        // url param
 	httpTimeout  time.Duration // timeout for http request
@@ -42,13 +42,14 @@ type roomUnit struct {
 
 type userInfo struct {
 	name               string     // uuid of userInfo
-	sid                string     // correspond with name roomName
+	sid                string     // correspond with name ns
 	uid                int        // digital id
 	lw                 sync.Mutex // lock for writing
 	connected          bool
 	readyForMsg        bool
 	connectionDuration time.Duration
 	hostCoWatch        bool // only the userInfo who create the room can be the host
+	expireTimer        *time.Ticker
 }
 
 type requestedUserInfo struct {

@@ -9,5 +9,5 @@ func TestRoomUnit_GetRoomID(t *testing.T) {
 	//if err := room.request(); err != nil {
 	//	t.Error("failed to finish request")
 	//}
-	//fmt.Println("room roomName = ", room.roomName)
+	//fmt.Println("room ns = ", room.ns)
 }

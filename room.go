@@ -2,10 +2,11 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -28,14 +29,14 @@ func newRoom(host string, httpTimeout, wsTimeout time.Duration, maximumUsers, ms
 	room.httpTimeout = httpTimeout
 	room.wsTimeout = wsTimeout
 	room.expireTime = 1440
-	room.sdkVersion = "1.0.0-7295-integration-b2a92020"
+	room.sdkVersion = rm.sdkVersion
 	room.condMutex = &sync.Mutex{}
 	room.cond = sync.NewCond(room.condMutex)
 	return room
 }
 
 // request is that the roomUnit try to create a room on the server
-func (p *roomUnit) request() error {
+func (p *roomUnit) request(ctx context.Context) error {
 	strings.TrimSuffix(p.address, "/")
 	uri := p.schema + "://" + p.address + "/" + "createRoom"
 	tr := func() *http.Transport {
@@ -57,25 +58,24 @@ func (p *roomUnit) request() error {
 	roomId := getHostId()
 	// construct post body json
 	bd := make(map[string]string)
-	for k, v := range rm.createRoomExtraField {
+	for k, v := range rm.createRoomExtraData {
 		bd[k] = v
 	}
 	bd["hostUid"] = fmt.Sprintf("%d", getHostId())
-	bd["appid"] = p.appId
+	bd["appId"] = p.appId
 	bd["version"] = p.sdkVersion
 	s, e := json.Marshal(bd)
 	if e != nil {
 		return e
 	}
+	log.Debugln("create room, post body is ", string(s))
 	req, _ := http.NewRequest("POST", uri, bytes.NewBuffer(s))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("content-length", fmt.Sprintf("%d", len(s)))
-	req.Header.Set("userInfo-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36 Edg/90.0.818.56")
 	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
 	req.Header.Set("accept", "*/*")
-	// setting for cors
-	req.Header.Set("origin", "https://cowatch.visualon.cn:8080")
-	req.Header.Set("referer", "https://cowatch.visualon.cn:8080/")
+
+	req.Header.Set("referer", "https://www.google.com/")
 	req.Header.Set("sec-fetch-dest", "empty")
 	req.Header.Set("sec-fetch-mode", "cors")
 	req.Header.Set("sec-fetch-site", "same-site")
@@ -83,10 +83,14 @@ func (p *roomUnit) request() error {
 	req.Header.Set("sec-ch-ua-mobile", "?0")
 	req.Header.Set("dnt", "1")
 
+	for k, v := range rm.httpHeaders {
+		req.Header.Set(k, v)
+	}
+
 	resp, err := newClient.Do(req)
 	if err != nil {
-		fmt.Println("Failed to post, err = ", err)
-		return errors.New("failed to post")
+		log.Errorln("Failed to post, err = ", err)
+		return err
 	}
 	defer resp.Body.Close()
 	p.connectionDuration = time.Since(start)
@@ -96,27 +100,24 @@ func (p *roomUnit) request() error {
 	room := new(roomInfo)
 	err = json.Unmarshal(roomRaw, room)
 	if err != nil {
-		fmt.Println("createRoom 返回 json 解析失败")
-		return errors.New("createRoom 返回 json 解析失败")
+		log.Errorln("create room: parsed response failed")
+		return err
 	}
-	p.roomName = room.Name
+	p.ns = room.Name
 	p.roomId = roomId
-
+	logF.WithFields(logrus.Fields{
+		"namespace": room.Name,
+		"roomId":    roomId,
+	}).Debugln("created room ok")
 	// Note: 房间创建完成后，即产生第一个 userInfo， 也是 Host
-	p.users = append(p.users, &userInfo{name: generateUserName(8), hostCoWatch: true, uid: roomId, connected: false, readyForMsg: false})
+	p.users = append(p.users, &userInfo{name: generateUserName(8), hostCoWatch: true, uid: roomId, connected: false, readyForMsg: false, expireTimer: time.NewTicker(24 * time.Hour)})
 
 	// add room to rm
 	p.rm.lockRoom.Lock()
 	p.rm.Rooms = append(p.rm.Rooms, p)
 	p.rm.lockRoom.Unlock()
+	go p.users[0].joinRoom(ctx, p, p.rm.parallelRequest, nil, nil)
 	return nil
-}
-
-type CreateRoomReqBody struct {
-	appID      string
-	expireTime int
-	hostUid    int
-	version    string
 }
 
 // preRequest is used for fetch method.
@@ -151,8 +152,7 @@ func (p *roomUnit) preRequest() {
 	preReq.Header.Set("sec-fetch-site", "same-site")
 	_, err := newClient.Do(preReq)
 	if err != nil {
-		fmt.Println("Failed to send OPTIONS method, err = ", err)
-		// return fmt.Errorf("failed to send OPTIONS method, err:%s", err.Error())
+		log.Errorln("Failed to send OPTIONS method, err = ", err)
 	}
 	// 如果 err != nil 则不能 close body，此处可以省略
 }

@@ -13,7 +13,7 @@ func TestRoomUnit_Chat(t *testing.T) {
 	//}
 	//log.SetFlags(0)
 	//log.SetOutput(ioutil.Discard)
-	//fmt.Println("room roomName = ", r.roomName)
+	//fmt.Println("room ns = ", r.ns)
 	//ctx, cancel := context.WithCancel(context.Background())
 	//defer cancel()
 	//ch := make(chan struct{})

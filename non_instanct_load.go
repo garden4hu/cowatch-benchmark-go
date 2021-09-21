@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
@@ -14,9 +13,9 @@ func NonInstanceLoading(conf *Config, ctx context.Context) {
 		return
 	}
 
-	err := rm.requestAllRooms(time.Now())
+	err := rm.requestAllRooms(ctx, time.Now())
 	if err != nil {
-		fmt.Println("failed to create room")
+		log.Errorln("failed to create room")
 		return
 	}
 	// request user serially
@@ -28,7 +27,7 @@ func NonInstanceLoading(conf *Config, ctx context.Context) {
 	//	return
 	//}
 	for rm.CheckCreatingRoomsOK() == false {
-		fmt.Println("not yet create room ok")
+		log.Errorln("not yet create room ok")
 		time.Sleep(1 * time.Second)
 	}
 	webSocketRunningDuration.Reset(time.Duration(conf.OnlineTime) * time.Second)
@@ -37,7 +36,7 @@ func NonInstanceLoading(conf *Config, ctx context.Context) {
 
 func getUsersSerial(conf *Config, ctx context.Context) {
 	if err := getUsers(conf, ctx); err != nil {
-		fmt.Println(err)
+		log.Errorln(err)
 		return
 	}
 }

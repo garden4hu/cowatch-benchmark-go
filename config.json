@@ -14,13 +14,18 @@
     "parallel_mode": 2,
     "app_id": "abcdefghijklmn",
     "ws_request_speed_number": 100,
-    "ws_online_duration_in_second": 3,
-    "createRoomExtraField": {
-      "expireTime": 5,
-      "hostname": "co-test-golang",
-      "maxMember": 4,
-      "roomRole": "room_valid_until_expired",
-      "hostLeaveRole": "host_transfer_to_second_after_host_leave",
-      "ownerBackRole": "host_return_after_owner_back"
+    "room_expiration_time": 300,
+    "sdk_version": "1.0.0-8589-integration-a3d4cd01",
+    "createRoomExtraData": {
+        "expireTime": 5,
+        "hostname": "co-test-golang",
+        "maxMember": 4,
+        "roomRole": "room_valid_until_expired",
+        "hostLeaveRole": "host_transfer_to_second_after_host_leave",
+        "ownerBackRole": "host_return_after_owner_back"
+    },
+    "http_header": {
+        "Origin": "qa.visualon.com",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36 Edg/93.0.961.52"
     }
 }
