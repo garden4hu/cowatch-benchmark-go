@@ -68,7 +68,7 @@ The configure file is json style. The full content of the configure file as foll
 | parallel_mode | uint | 0 | N | mode for socket requesting server. <br>0 means serial <br>1 means parallel  <br>2 mean batch |
 | start_time_for_create_rooms | string |   | O |  used in parallel = 1 only, such as "2021-05-13T13:49:00.00+08:00" |
 | start_time_for_create_users | string |   | O |  used in parallel = 1 only, such as "2021-05-13T13:50:00.00+08:00" |
-| single_client_mode | uint | 1 | N | use this tool in single point only |
+| single_client_mode | uint | 1 | N |  0: multi-point testing <br>1: single-point testing |
 | app_id | string |  | Y | rtc token  |
 | ws_request_speed_number_for_mode_2 | int | | O | the number of ws request in a batch |
 | room_expiration_time_in_second | uint | 300s | Y | the living time for a room |
@@ -80,7 +80,7 @@ The configure file is json style. The full content of the configure file as foll
 
 **Note: Configure file mode will override other arguments**
 
-### Local configure file
+## Local configure file
 CoWatchBenchmark-go can be started with a configure file which locates in local driver. For example:
 ```bash
 ./CoWatchBenchmark -c ./config.json # config.json and CoWatchBenchmark are in the same directory.
@@ -88,15 +88,66 @@ CoWatchBenchmark-go can be started with a configure file which locates in local 
 ./CoWatchBenchmark -c /etc/cowatch/config.json
 ```
 
-### Remote configure file
+## Remote configure file
 CoWatchBenchmark-go can also be started with a remote configure file. It's very powerful when you want to getRooms multiple jobs in different client mechine. For example:
 
 ```bash
 ./CoWatchBenchmark -cr https://server_host/path/to/your/config
 ```
-Using remote configure file can be start this program parallel in different client by setting the field `start_time_room` and `start_time_user`.
+Using remote configure file can be start this program parallel in different client by setting the field `start_time_room` and `start_time_user` when you want to start multi-point jobs.
 
-    Note: `start_time_user` should be after `start_time_room`. The time difference shouldn't be less then 60s.
+
+## Testing mode
+### testing scale
+From the perspective of test scale, there are two ways of single-point testing and multi-point testing.
+
+* Single point : run one copy of this program
+* Multi point : run multi copy of this program in multi host
+
+
+### request sequence
+
+From the perspective of request sequence, it is divided into sequential requests, concurrent requests and batch requests.
+
+* sequential requests: all http/ws requsets are sequential, i.e. one by one.
+* concurrent requests: all http/ws requsets launch in the same time.
+* batch requests: it alleviate the inefficiency of sequential requests. Essentially, it changes one request only at a time of sequential requests to several concurrent requests at a time.
+
+Note: If the number of each batch in the batch requests is too large, the batch request will become a concurrent requests.
+
+
+### samples
+
+#### Single point
+```json
+"single_client_mode": 1
+```
+
+#### Multi point
+
+```json
+"single_client_mode": 0
+```
+#### sequential requests
+
+```json
+"parallel_mode":0
+```
+
+#### concurrent requests
+
+```json
+"start_time_for_create_rooms": "2021-05-13T13:49:00.00+08:00",
+"start_time_for_create_users": "2021-05-13T13:50:00.00+08:00",
+"parallel_mode" : 1
+```
+
+#### batch requests
+
+```json
+"parallel_mode" : 2,
+"ws_request_speed_number_for_mode_2": 100
+```
 
 ## Extra parameter of creating room
 There is a `createRoomExtraData` field in the config file. It supports adding extra data to the body of HTTP requesting. **You should not add an array or an object into the createRoomExtraData object. That is to say, only string and number are supporting.**
