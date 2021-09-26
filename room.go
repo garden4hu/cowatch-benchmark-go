@@ -17,7 +17,7 @@ import (
 
 // newRoom return a roomUnit object
 func newRoom(host string, httpTimeout, wsTimeout time.Duration, maximumUsers, msgLength, frequency int, appId string, rm *roomManager) *roomUnit {
-	room := &roomUnit{usersCap: maximumUsers, msgLength: msgLength, msgSendingInternal: time.Millisecond * time.Duration(frequency), appId: appId, rm: rm}
+	room := &roomUnit{usersCap: maximumUsers, msgLength: msgLength, msgSendingInternal: time.Microsecond * 1000 * time.Duration((60*1000)/frequency), appId: appId, rm: rm}
 	ur, _ := url.Parse(host)
 	room.schema = ur.Scheme
 	room.address = ur.Host
@@ -72,7 +72,7 @@ func (p *roomUnit) request(ctx context.Context) error {
 	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
 	req.Header.Set("accept", "*/*")
 
-	req.Header.Set("referer", "https://www.google.com/")
+	req.Header.Set("referer", "https://visualon.com/")
 	req.Header.Set("sec-fetch-dest", "empty")
 	req.Header.Set("sec-fetch-mode", "cors")
 	req.Header.Set("sec-fetch-site", "same-site")
@@ -83,6 +83,7 @@ func (p *roomUnit) request(ctx context.Context) error {
 	for k, v := range rm.httpHeaders {
 		req.Header.Set(k, v)
 	}
+	log.Debugln("http header :", req.Header)
 
 	resp, err := newClient.Do(req)
 	if err != nil {
@@ -93,11 +94,15 @@ func (p *roomUnit) request(ctx context.Context) error {
 	p.connectionDuration = time.Since(start)
 	roomRaw, _ := ioutil.ReadAll(resp.Body)
 
+	log.Debugln("roomRaw: ", string(roomRaw))
 	// unmarshal
 	room := new(roomInfo)
 	err = json.Unmarshal(roomRaw, room)
 	if err != nil {
 		log.Errorln("create room: parsed response failed")
+		return err
+	} else if room.Name == "" {
+		log.Errorln("create room: response is not wanted")
 		return err
 	}
 	p.ns = room.Name
@@ -113,7 +118,7 @@ func (p *roomUnit) request(ctx context.Context) error {
 	p.rm.lockRoom.Lock()
 	p.rm.Rooms = append(p.rm.Rooms, p)
 	p.rm.lockRoom.Unlock()
-	go p.users[0].joinRoom(ctx, p, p.rm.parallelRequest, nil, nil)
+	go p.users[0].joinRoom(ctx, p, false, nil, nil)
 	return nil
 }
 

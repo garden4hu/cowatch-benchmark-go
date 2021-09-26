@@ -150,6 +150,7 @@ func generateMsgBody(msgCMD string, jsonBody string) string {
 }
 
 func (user *userInfo) generateConnectAndDisconnectMessage(n socketIOV4Type, ns string) []byte {
+	log.Debugln("generate Open msg, ns: ", ns)
 	if ns != "" {
 		ns = "/" + ns
 	}
@@ -227,11 +228,12 @@ func (user *userInfo) onEngineOpen(b []byte, room *roomUnit, conn *websocket.Con
 	room.pingTimeout = userInfo.PingTimeOut
 
 	msg := user.generateConnectAndDisconnectMessage(socketTypeCONNECT, room.ns)
-	log.Debugln("pong sent")
+	log.Debugln("process EngineIO Open event: response msg:", string(msg))
 	if err = conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-		log.Errorln("[ERR] ws failed to send join room msg")
+		log.Errorln("process EngineIO Open event: response msg failed")
 		return err
 	}
+	log.Debugln("process EngineIO Open event: response msg OK")
 	return nil
 }
 
