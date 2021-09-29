@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/sirupsen/logrus"
+	"io/fs"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -39,6 +40,14 @@ var verbose = flag.Bool("v", false, "show log")
 
 var log = logrus.New()
 var logF = logrus.New()
+var logA = logrus.New()
+
+var logIn = logrus.New()
+var logOut = logrus.New()
+var inlog *os.File
+var outlog *os.File
+
+var gID int32 = 0 // global number for generate user id
 
 func init() {
 	flag.Parse()
@@ -50,10 +59,49 @@ func init() {
 		ForceColors:   true,
 		FullTimestamp: true,
 	}
+	logA.Formatter = &logrus.TextFormatter{
+		ForceColors: true,
+	}
+
+	logIn.Formatter = &logrus.TextFormatter{
+		FullTimestamp: true,
+	}
+	logOut.Formatter = &logrus.TextFormatter{
+		FullTimestamp: true,
+	}
+	workDir := filepath.Dir(os.Args[0])
+	infile := filepath.Join(workDir, "in.log")
+	if fs.ValidPath(infile) {
+		_ = os.Remove(infile)
+	}
+	outfile := filepath.Join(workDir, "out.log")
+	if fs.ValidPath(outfile) {
+		_ = os.Remove(outfile)
+	}
+	inHandler, err := os.Create(infile)
+	if err == nil {
+		inlog = inHandler
+	} else {
+		inHandler = os.Stdout
+	}
+	outHandler, err := os.Create(outfile)
+	if err == nil {
+		outlog = outHandler
+	} else {
+		outHandler = os.Stdout
+	}
+
+	logIn.SetOutput(inHandler)
+	logOut.SetOutput(outHandler)
+	logIn.SetLevel(logrus.DebugLevel)
+	logOut.SetLevel(logrus.DebugLevel)
+
 	log.SetReportCaller(true)
 	log.SetOutput(os.Stderr)
 	logF.SetOutput(os.Stdout)
+	logA.SetOutput(os.Stdout)
 	log.SetLevel(logrus.InfoLevel)
+	logF.SetLevel(logrus.InfoLevel)
 	logF.SetLevel(logrus.InfoLevel)
 	if *verbose == true {
 		log.SetLevel(logrus.DebugLevel)
@@ -66,7 +114,17 @@ var onlineUser int
 var analytics *statistic
 var webSocketRunningDuration *time.Ticker
 
+var onlineUserPingOK int
+
 func main() {
+	defer func() {
+		if inlog != os.Stdout && inlog != os.Stderr {
+			inlog.Close()
+		}
+		if outlog != os.Stdout && outlog != os.Stderr {
+			outlog.Close()
+		}
+	}()
 	// process args
 	var configure *Config
 	if len(*config) > 0 {
@@ -140,6 +198,9 @@ func main() {
 			break
 		case t := <-rm.notifyUsersAdd:
 			onlineUser += t
+			break
+		case t := <-rm.notifyUserPingOK:
+			onlineUserPingOK += t
 			break
 		case <-webSocketRunningDuration.C:
 			webSocketRunningDuration.Stop()

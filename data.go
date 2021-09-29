@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"sync"
 	"time"
 )
@@ -24,6 +25,8 @@ type roomUnit struct {
 
 	condMutex *sync.Mutex // used for conditional waiting
 	cond      *sync.Cond
+
+	msgPool *sync.Pool
 
 	// for statistics
 	connectionDuration time.Duration
@@ -50,6 +53,18 @@ type userInfo struct {
 	connectionDuration time.Duration
 	hostCoWatch        bool // only the userInfo who create the room can be the host
 	expireTimer        *time.Ticker
+	msgPool            *sync.Pool
+	msgCtx             *context.Context
+	msgCancelFunc      context.CancelFunc
+
+	pingTimer *time.Ticker
+
+	// for debug
+	lastPing              time.Time
+	pingIntervalStartTime time.Duration
+	wsReqTimeOH           time.Duration // websocket request time over head
+	wsPrologTimeOH        time.Duration // websocket prolog before clock sync time over head
+	id                    int
 }
 
 type requestedUserInfo struct {

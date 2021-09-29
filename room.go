@@ -29,6 +29,11 @@ func newRoom(host string, httpTimeout, wsTimeout time.Duration, maximumUsers, ms
 	room.sdkVersion = rm.sdkVersion
 	room.condMutex = &sync.Mutex{}
 	room.cond = sync.NewCond(room.condMutex)
+	room.msgPool = &sync.Pool{New: func() interface{} {
+		pd := new(poolData)
+		pd.buf = make([]byte, 4096)
+		return pd
+	}}
 	return room
 }
 
@@ -36,19 +41,7 @@ func newRoom(host string, httpTimeout, wsTimeout time.Duration, maximumUsers, ms
 func (p *roomUnit) request(ctx context.Context) error {
 	strings.TrimSuffix(p.address, "/")
 	uri := p.schema + "://" + p.address + "/" + "createRoom"
-	tr := func() *http.Transport {
-		return &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-	}
-	newClient := func() *http.Client {
-		if p.schema == "https" {
-			return &http.Client{Transport: tr(), Timeout: p.httpTimeout}
-		} else {
-			return &http.Client{Timeout: p.httpTimeout}
-		}
 
-	}()
 	// p.preRequest()
 	start := time.Now()
 
@@ -79,27 +72,47 @@ func (p *roomUnit) request(ctx context.Context) error {
 	req.Header.Set("sec-ch-ua", "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"90\", \"Microsoft Edge\";v=\"90\"")
 	req.Header.Set("sec-ch-ua-mobile", "?0")
 	req.Header.Set("dnt", "1")
+	req.Close = true // https://stackoverflow.com/a/23963271/16747223
 
 	for k, v := range rm.httpHeaders {
 		req.Header.Set(k, v)
 	}
 	log.Debugln("http header :", req.Header)
 
+	tr := getTransport()
+	defer putTransport(tr) // put transport
+	newClient := func() *http.Client {
+		if p.schema == "https" {
+			return &http.Client{Transport: tr, Timeout: p.httpTimeout}
+		} else {
+			return &http.Client{Timeout: p.httpTimeout}
+		}
+	}()
+
 	resp, err := newClient.Do(req)
 	if err != nil {
 		log.Errorln("Failed to post, err = ", err)
 		return err
 	}
-	defer resp.Body.Close()
 	p.connectionDuration = time.Since(start)
-	roomRaw, _ := ioutil.ReadAll(resp.Body)
+	roomRaw, err := func() ([]byte, error) {
+
+		defer newClient.CloseIdleConnections()
+		defer resp.Body.Close()
+		return ioutil.ReadAll(resp.Body)
+	}()
+
+	if err != nil {
+		log.Errorln(err)
+		return err
+	}
 
 	log.Debugln("roomRaw: ", string(roomRaw))
 	// unmarshal
 	room := new(roomInfo)
 	err = json.Unmarshal(roomRaw, room)
 	if err != nil {
-		log.Errorln("create room: parsed response failed")
+		log.Errorln("create room: parsed response failed, response data:", string(roomRaw))
 		return err
 	} else if room.Name == "" {
 		log.Errorln("create room: response is not wanted")
@@ -112,7 +125,12 @@ func (p *roomUnit) request(ctx context.Context) error {
 		"roomId":    roomId,
 	}).Debugln("created room ok")
 	// Note: 房间创建完成后，即产生第一个 userInfo， 也是 Address
-	p.users = append(p.users, &userInfo{name: generateUserName(8), hostCoWatch: true, uid: roomId, connected: false, readyForMsg: false, expireTimer: time.NewTicker(24 * time.Hour)})
+	userHost := newUser(p)
+	userHost.name = generateUserName(8)
+	userHost.hostCoWatch = true
+	userHost.uid = roomId
+	userHost.expireTimer = time.NewTicker(24 * time.Hour)
+	p.users = append(p.users, userHost)
 
 	// add room to rm
 	p.rm.lockRoom.Lock()
@@ -127,19 +145,7 @@ func (p *roomUnit) request(ctx context.Context) error {
 func (p *roomUnit) preRequest() {
 	strings.TrimSuffix(p.address, "/")
 	uri := p.schema + "://" + p.address + "/" + "createRoom"
-	tr := func() *http.Transport {
-		return &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-	}
-	newClient := func() *http.Client {
-		if p.schema == "https" {
-			return &http.Client{Transport: tr(), Timeout: p.httpTimeout}
-		} else {
-			return &http.Client{Timeout: p.httpTimeout}
-		}
 
-	}()
 	// request options method
 	preReq, _ := http.NewRequest("OPTIONS", uri, nil)
 	preReq.Header.Set("access-control-request-headers", "content-type")
@@ -152,9 +158,21 @@ func (p *roomUnit) preRequest() {
 	preReq.Header.Set("sec-fetch-dest", "empty")
 	preReq.Header.Set("sec-fetch-mode", "cors")
 	preReq.Header.Set("sec-fetch-site", "same-site")
+
+	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	newClient := func() *http.Client {
+		if p.schema == "https" {
+			return &http.Client{Transport: tr, Timeout: p.httpTimeout}
+		} else {
+			return &http.Client{Timeout: p.httpTimeout}
+		}
+
+	}()
 	_, err := newClient.Do(preReq)
 	if err != nil {
 		log.Errorln("Failed to send OPTIONS method, err = ", err)
 	}
+	// put transport
+	putTransport(tr)
 	// 如果 err != nil 则不能 close body，此处可以省略
 }

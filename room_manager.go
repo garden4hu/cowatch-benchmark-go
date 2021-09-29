@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -25,6 +26,14 @@ type roomManager struct {
 	parallelRequest  bool
 	sdkVersion       string
 	notifyUsersAdd   <-chan int // chan 大小为 用户总数
+	notifyRoomAdd    <-chan int
+
+	notifyUserPingOK chan int
+
+	messagePool *sync.Pool
+
+	// Transport
+	tr *http.Transport
 
 	// for internal usage
 	notifyUserAdd            chan int
@@ -45,6 +54,15 @@ func newRoomManager(conf *Config) *roomManager {
 	rm.notifyUsersAdd = rm.notifyUserAdd
 	rm.finishedReqRoomRoutines = 0
 	rm.finishedReqUsersRoutines = 0
+	tr := &http.Transport{}
+	rm.tr = tr
+	pingChannelSize := func() int {
+		if conf.Rooms*conf.UsersPerRoom > 8 {
+			return conf.Rooms * conf.UsersPerRoom / 4
+		}
+		return 4
+	}()
+	rm.notifyUserPingOK = make(chan int, pingChannelSize)
 	return rm
 }
 
@@ -114,6 +132,10 @@ func (p *roomManager) requestAllRooms(ctx context.Context, when time.Time) error
 	}
 	p.creatingRoomsOK = true
 	return nil
+}
+
+type transprotPool struct {
+	*http.Transport
 }
 
 func (p *roomManager) requestRoom(ctx context.Context, wg *sync.WaitGroup, start chan struct{}) {

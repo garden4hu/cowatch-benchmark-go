@@ -6,14 +6,17 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 // newUser construct the user
-func newUser() *userInfo {
-	return &userInfo{name: generateUserName(8), uid: getHostId(), hostCoWatch: false, connected: false, readyForMsg: false, expireTimer: time.NewTicker(24 * time.Hour)}
+func newUser(p *roomUnit) *userInfo {
+	u := &userInfo{name: generateUserName(8), uid: getHostId(), hostCoWatch: false, connected: false, readyForMsg: false, expireTimer: time.NewTicker(24 * time.Hour), msgPool: p.msgPool}
+	u.id = int(atomic.AddInt32(&gID, 1))
+	return u
 }
 
 // usersConnection try to connect to the server and exchange message.
@@ -23,6 +26,9 @@ func (p *roomUnit) usersConnection(start chan struct{}, ctx context.Context, wg 
 	if p.rm.parallelRequest {
 		defer wg.Done()
 	}
+	if p.users[0].connected == false {
+		// if users[0] is offline
+	}
 	// create users
 	var wg2 sync.WaitGroup // 用于并发请求，确保所有的 goroutine 同时发起请求，而不会出现开始并发请求时，有的 goroutine 还没有构造好 ws 句柄
 	for i := 1; i < p.usersCap; i++ {
@@ -31,19 +37,27 @@ func (p *roomUnit) usersConnection(start chan struct{}, ctx context.Context, wg 
 			if i == 0 {
 				return p.users[0]
 			} else {
-				return newUser()
+				return newUser(p)
 			}
 		}()
 		go u.joinRoom(ctx, p, p.rm.parallelRequest, start, &wg2)
+		time.Sleep(500 * time.Millisecond) // avoid concurrent
 	}
 	wg2.Wait()
 	if p.rm.parallelRequest == false {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(600 * time.Millisecond)
 	}
 }
 
 // joinRoom join the room on the websocket server
 func (user *userInfo) joinRoom(ctx context.Context, r *roomUnit, parallel bool, start chan struct{}, wg *sync.WaitGroup) {
+	defer log.Infoln("goroutine exist")
+
+	defer func() {
+		if user.pingTimer != nil {
+			user.pingTimer.Stop()
+		}
+	}()
 	// if request users concurrently, goroutine should be waited
 	if wg != nil {
 		wg.Done() // create goroutine done
@@ -53,90 +67,67 @@ func (user *userInfo) joinRoom(ctx context.Context, r *roomUnit, parallel bool, 
 			<-start // waiting for starting
 		}
 	}
-	startJoin := time.Now()
-	conn, err := wsConnect(ctx, r, user)
-	if err != nil {
-		log.Errorln("failed to create websocket connection, err = ", err)
-		return
-	}
+
 	// add user to roomUnit
 	r.muxUsers.Lock()
 	r.users = append(r.users, user) // add user to room
 	r.muxUsers.Unlock()
-	r.rm.notifyUserAdd <- 1 // 通知新增用户
 
-	user.connectionDuration = time.Since(startJoin)
-	defer conn.Close()
-	user.connected = true
-
-	defer func() {
-		r.rm.notifyUserAdd <- -1
-	}() // 通知用户下线
-
-	done := make(chan bool)
-	defer close(done)
-
-	receivedData := make(chan []byte)
-	defer close(receivedData)
-	// starting a new goroutine for receiveMessage the websocket message
-	go user.receiveMessage(ctx, conn, done, receivedData)
-
-	//pingTicker := time.NewTicker(time.Millisecond * time.Duration(r.pingInterval))
-	//log.Println("ping ticker duration:", r.pingInterval)
-	//defer pingTicker.Stop()
+	messageCh := make(chan []byte)
+	defer close(messageCh)
+	user.pingTimer = time.NewTicker(60 * time.Second)
+	startWS := func() (context.Context, error) {
+		msgCtx, cancel := context.WithCancel(ctx)
+		startJoin := time.Now()
+		conn, err := wsConnect(msgCtx, r, user)
+		if err == nil {
+			user.wsReqTimeOH = time.Now().Sub(startJoin)
+			logIn.Debugln("goID:", user.id, " ws_req_time(ms):", user.wsReqTimeOH.Milliseconds())
+			go user.receiveMessage(conn, r, messageCh, cancel)
+			go user.sendMessage(conn, r, messageCh, r.msgSendingInternal, cancel)
+			user.connectionDuration = time.Since(startJoin)
+			return msgCtx, err
+		} else {
+			log.Errorln("failed to launch ws")
+			cancel()
+			return nil, err
+		}
+	}
 
 	// 对于测试环境而言，host 发送的 sync 信息频次较高，故对于 host userInfo，需要考虑其发送频率
 	// 而对于 Guests, 其 websocket 消息内容更多为 text，ping/pong，这些消息频次较低
+	wsCTX, err := startWS()
+	if err != nil {
+		return
+	}
 	sendMsgTicker := time.NewTicker(r.msgSendingInternal)
 	defer sendMsgTicker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-done:
-			// need to reconnect
-			_ = conn.Close()
-			conn, err = wsConnect(ctx, r, user)
-			if err != nil {
-				log.Errorln("failed to reconnect to ws server, err = ", err)
-				return
-			} else {
-				go user.receiveMessage(ctx, conn, done, receivedData)
-			}
-			break
-			//case _ = <-pingTicker.C:
-			//	// reset pingTicker and send ping
-			//	if conn != nil {
-			//		user.lw.Lock()
-			//		err := conn.WriteMessage(websocket.TextMessage, []byte("2"))
-			//		user.lw.Unlock()
-			//		if err != nil {
-			//			log.Println("write:", err)
-			//		}
-			//	}
-			//	pingTicker.Reset(time.Millisecond * time.Duration(r.pingInterval))
-
-		case <-user.expireTimer.C:
-			return
-		case _ = <-sendMsgTicker.C:
-			if user.hostCoWatch {
-				// 在测试环境中，由于用户的 text 的信息数量可以忽略，故此处只允许 host 发送消息到服务器
-				if user.connected {
-					msg := generateMessage(r)
-					if conn != nil {
-						_ = conn.WriteMessage(websocket.TextMessage, msg)
-					}
-					sendMsgTicker.Reset(r.msgSendingInternal)
+		case <-wsCTX.Done():
+			// try to reconnect
+			r.rm.notifyUserAdd <- -1 // user offline
+			user.connected = false
+			i := 0
+			for ; i < 1; i++ {
+				wsCTX, err = startWS()
+				if err != nil {
+					continue
+				} else {
+					break
 				}
 			}
-		case rd := <-receivedData:
-			log.Debugln("received ws message:", string(rd))
-			err := user.sendResponse(conn, rd, r)
-			if err != nil {
+			if i == 3 {
+				log.Errorln("failed to reconnect to websocket server")
 				return
 			}
+			log.Infoln("reconnect websocket server successfully")
+			break
+		case <-user.expireTimer.C:
+			return
 		default:
-
 		}
 	}
 }
@@ -164,10 +155,17 @@ func wsConnect(ctx context.Context, r *roomUnit, p *userInfo) (*websocket.Conn, 
 		u.Scheme = "wss"
 		break
 	}
+
+	//pool := &sync.Pool{New: func() interface{} {
+	//	s := new(poolData)
+	//	return &s
+	//}}
 	dialer := &websocket.Dialer{
 		Proxy:             http.ProxyFromEnvironment,
 		HandshakeTimeout:  r.wsTimeout,
 		EnableCompression: true,
+		WriteBufferSize:   128, // because the longest size of message is 250, 128 is half of the largest size of message according to the guide of gorilla
+		WriteBufferPool:   &sync.Pool{},
 	}
 	// set http->websocket header
 	rq := http.Header{}
@@ -185,6 +183,7 @@ func wsConnect(ctx context.Context, r *roomUnit, p *userInfo) (*websocket.Conn, 
 	for i := 0; i < 3; i++ {
 		conn, _, err = dialer.DialContext(ctx, u.String(), rq)
 		if err != nil {
+			log.Errorln("websocket dialer error: ", err)
 			if i < 3 {
 				time.Sleep(50 * time.Millisecond)
 				continue
