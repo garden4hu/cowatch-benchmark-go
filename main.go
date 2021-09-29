@@ -7,7 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io/fs"
 	"io/ioutil"
 	"net/http"
@@ -15,6 +14,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 var config = flag.String("c", "", "[Mandatory] configure: configure file")
@@ -46,6 +47,8 @@ var logIn = logrus.New()
 var logOut = logrus.New()
 var inlog *os.File
 var outlog *os.File
+
+var enableEPOLL = true
 
 var gID int32 = 0 // global number for generate user id
 
@@ -103,7 +106,7 @@ func init() {
 	log.SetLevel(logrus.InfoLevel)
 	logF.SetLevel(logrus.InfoLevel)
 	logF.SetLevel(logrus.InfoLevel)
-	if *verbose == true {
+	if *verbose {
 		log.SetLevel(logrus.DebugLevel)
 		logF.SetLevel(logrus.DebugLevel)
 	}
@@ -125,49 +128,17 @@ func main() {
 			outlog.Close()
 		}
 	}()
-	// process args
-	var configure *Config
-	if len(*config) > 0 {
-		conf, err := readConfigure(*config)
-		if err != nil {
-			log.Errorln("failed to read configure, check your path or content of configure file, program will be exited")
-			return
-		}
-		configure = conf
-	} else if len(*remoteConfig) > 0 {
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client := &http.Client{Transport: tr}
-		resp, err := client.Get(*remoteConfig)
-		if err != nil {
-			log.Errorln("[error]  Program failed to download configure file from remote source, will be exited")
-			return
-		}
-		defer resp.Body.Close()
-		b, _ := ioutil.ReadAll(resp.Body)
-		var conf Config
-		if err := json.Unmarshal(b, &conf); err != nil {
-			log.Errorln("failed to read configure file, check your path or make sure the content is ok, program will be exited now")
-			return
-		}
-		configure = &conf
-	} else {
-		log.Errorln("program doesn't support command, please set the configure file, it will be exited now")
-		return
-	}
-	indent, err := json.MarshalIndent(configure, "", "\t")
-	if err == nil {
-		log.Infoln("your configure is :\n", string(indent))
-	}
 
-	if e := checkConfigure(configure); e != nil {
-		log.Errorln(e.Error())
+	// process configure
+	configure, err := getConfigure()
+	if err != nil {
 		return
 	}
 	rm = newRoomManager(configure)
 	processExtraHttpData(rm, configure)
 	defer rm.Close()
+
+	initWorker()
 	// register system interrupt
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
@@ -195,13 +166,10 @@ func main() {
 		case <-ticker.C:
 			go printLogMessage(rm)
 			ticker.Reset(1 * time.Second)
-			break
 		case t := <-rm.notifyUsersAdd:
 			onlineUser += t
-			break
 		case t := <-rm.notifyUserPingOK:
 			onlineUserPingOK += t
-			break
 		case <-webSocketRunningDuration.C:
 			webSocketRunningDuration.Stop()
 			log.Warnln("The program exits at time")
@@ -212,7 +180,7 @@ func main() {
 
 func readConfigure(path string) (*Config, error) {
 	path = filepath.Clean(path)
-	if filepath.IsAbs(path) == false {
+	if filepath.IsAbs(path) {
 		dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 		path = filepath.Join(dir, path)
 	}
@@ -273,11 +241,11 @@ func processExtraHttpData(rm *roomManager, conf *Config) {
 
 	rm.createRoomExtraData = make(map[string]string)
 	for k, v := range c {
-		switch v.(type) {
+		switch v := v.(type) {
 		case string:
-			rm.createRoomExtraData[k] = v.(string)
+			rm.createRoomExtraData[k] = v
 		case float64:
-			rm.createRoomExtraData[k] = fmt.Sprintf("%d", int(v.(float64)))
+			rm.createRoomExtraData[k] = fmt.Sprintf("%d", int(v))
 		default:
 		}
 	}
@@ -286,12 +254,50 @@ func processExtraHttpData(rm *roomManager, conf *Config) {
 
 	rm.httpHeaders = make(map[string]string)
 	for k, v := range h {
-		switch v.(type) {
+		switch v := v.(type) {
 		case string:
-			rm.httpHeaders[k] = v.(string)
+			rm.httpHeaders[k] = v
 		default:
 		}
 	}
+}
+
+func getConfigure() (conf *Config, err error) {
+	if len(*config) > 0 {
+		conf, err = readConfigure(*config)
+		if err != nil {
+			log.Errorln("failed to read configure, check your path or content of configure file, program will be exited")
+		}
+	} else if len(*remoteConfig) > 0 {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client := &http.Client{Transport: tr}
+		resp, err := client.Get(*remoteConfig)
+		if err != nil {
+			log.Errorln("[error]  Program failed to download configure file from remote source, will be exited")
+			return conf, err
+		}
+		defer resp.Body.Close()
+		b, _ := ioutil.ReadAll(resp.Body)
+		var config Config
+		if err = json.Unmarshal(b, &config); err != nil {
+			log.Errorln("failed to read configure file, check your path or make sure the content is ok, program will be exited now")
+			return conf, err
+		}
+		conf = &config
+	} else {
+		log.Errorln("program doesn't support command, please set the configure file, it will be exited now")
+	}
+	indent, e := json.MarshalIndent(conf, "", "\t")
+	if e == nil {
+		log.Infoln("your configure is :\n", string(indent))
+	}
+	if err = checkConfigure(conf); e != nil {
+		log.Errorln(e.Error())
+		return conf, err
+	}
+	return conf, err
 }
 
 type Config struct {

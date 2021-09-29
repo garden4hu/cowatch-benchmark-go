@@ -12,7 +12,7 @@ func getRooms(ctx context.Context, conf *Config) error {
 
 		return errors.New("create roomManager please")
 	}
-	if 0 == conf.Rooms {
+	if conf.Rooms == 0 {
 		return nil
 	}
 

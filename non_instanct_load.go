@@ -26,7 +26,7 @@ func NonInstanceLoading(conf *Config, ctx context.Context) {
 	//	rm.Rooms = rm.Rooms[:len(rm.Rooms)-1]
 	//	return
 	//}
-	for rm.CheckCreatingRoomsOK() == false {
+	for rm.CheckCreatingRoomsOK() {
 		log.Errorln("not yet create room ok")
 		time.Sleep(1 * time.Second)
 	}

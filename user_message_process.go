@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/gorilla/websocket"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 // receiveMessage
@@ -79,7 +80,6 @@ func (user *userInfo) sendMessage(conn *websocket.Conn, room *roomUnit, rdata ch
 		case <-user.pingTimer.C: // if ping/pong ok, this ticker will be never triggered
 			room.rm.notifyUserPingOK <- -1
 			logOut.Warnln("goID:", user.id, " still not has normal ping/pong. WARN")
-		default:
 		}
 	}
 }
@@ -269,25 +269,25 @@ const (
 	engineTypeNOOP
 )
 
-func (n engineIOV4Type) toInt() int8 {
-	switch n {
-	case engineTypeOPEN:
-		return 0
-	case engineTypeCLOSE:
-		return 1
-	case engineTypePING:
-		return 2
-	case engineTypePONG:
-		return 3
-	case engineTypeMESSAGE:
-		return 4
-	case engineTypeUPGRADE:
-		return 5
-	case engineTypeNOOP:
-		return 6
-	}
-	return 4
-}
+// func (n engineIOV4Type) toInt() int8 {
+// 	switch n {
+// 	case engineTypeOPEN:
+// 		return 0
+// 	case engineTypeCLOSE:
+// 		return 1
+// 	case engineTypePING:
+// 		return 2
+// 	case engineTypePONG:
+// 		return 3
+// 	case engineTypeMESSAGE:
+// 		return 4
+// 	case engineTypeUPGRADE:
+// 		return 5
+// 	case engineTypeNOOP:
+// 		return 6
+// 	}
+// 	return 4
+// }
 
 type socketIOV4Type int8
 
@@ -301,25 +301,25 @@ const (
 	socketTypeBINARYACK
 )
 
-func (n socketIOV4Type) toInt() int8 {
-	switch n {
-	case socketTypeCONNECT:
-		return 0
-	case socketTypeDISCONNECT:
-		return 1
-	case socketTypeEVENT:
-		return 2
-	case socketTypeACK:
-		return 3
-	case socketTypeERROR:
-		return 4
-	case socketTypeBINARYEVENT:
-		return 5
-	case socketTypeBINARYACK:
-		return 6
-	}
-	return 2
-}
+// func (n socketIOV4Type) toInt() int8 {
+// 	switch n {
+// 	case socketTypeCONNECT:
+// 		return 0
+// 	case socketTypeDISCONNECT:
+// 		return 1
+// 	case socketTypeEVENT:
+// 		return 2
+// 	case socketTypeACK:
+// 		return 3
+// 	case socketTypeERROR:
+// 		return 4
+// 	case socketTypeBINARYEVENT:
+// 		return 5
+// 	case socketTypeBINARYACK:
+// 		return 6
+// 	}
+// 	return 2
+// }
 
 func generateMsgBody(msgCMD string, body []byte) string {
 	b, e := json.Marshal(msgCMD)
@@ -355,23 +355,23 @@ func (user *userInfo) generateEventMessage(ns string, id *int, msgCMD string, bo
 
 }
 
-func (user *userInfo) generateACKMessage(ns string, id int, data string) []byte {
-	if ns != "" {
-		ns = "/" + ns
-	}
-	data = "" // data doesn't support now
-	return []byte("43" + ns + "," + strconv.Itoa(id) + data)
-}
+// func (user *userInfo) generateACKMessage(ns string, id int, data string) []byte {
+// 	if ns != "" {
+// 		ns = "/" + ns
+// 	}
+// 	data = "" // data doesn't support now
+// 	return []byte("43" + ns + "," + strconv.Itoa(id) + data)
+// }
 
-func (user *userInfo) generateERRORMessage(ns string, data string) []byte {
-	if ns != "" {
-		ns = "/" + ns
-	}
-	b, e := json.Marshal(data)
-	if e != nil {
-		data = ""
-	} else {
-		data = string(b)
-	}
-	return []byte("44" + ns + "," + data)
-}
+// func (user *userInfo) generateERRORMessage(ns string, data string) []byte {
+// 	if ns != "" {
+// 		ns = "/" + ns
+// 	}
+// 	b, e := json.Marshal(data)
+// 	if e != nil {
+// 		data = ""
+// 	} else {
+// 		data = string(b)
+// 	}
+// 	return []byte("44" + ns + "," + data)
+// }

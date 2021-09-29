@@ -6,13 +6,14 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // newRoom return a roomUnit object
@@ -39,7 +40,7 @@ func newRoom(host string, httpTimeout, wsTimeout time.Duration, maximumUsers, ms
 
 // request is that the roomUnit try to create a room on the server
 func (p *roomUnit) request(ctx context.Context) error {
-	strings.TrimSuffix(p.address, "/")
+	p.address = strings.TrimSuffix(p.address, "/")
 	uri := p.schema + "://" + p.address + "/" + "createRoom"
 
 	// p.preRequest()
@@ -136,14 +137,14 @@ func (p *roomUnit) request(ctx context.Context) error {
 	p.rm.lockRoom.Lock()
 	p.rm.Rooms = append(p.rm.Rooms, p)
 	p.rm.lockRoom.Unlock()
-	go p.users[0].joinRoom(ctx, p, false, nil, nil)
+	go p.users[0].joinRoom(ctx, p, false, nil, nil) // user connecting
 	return nil
 }
 
 // preRequest is used for fetch method.
 // for some version, it maybe has options method to request
 func (p *roomUnit) preRequest() {
-	strings.TrimSuffix(p.address, "/")
+	p.address = strings.TrimSuffix(p.address, "/")
 	uri := p.schema + "://" + p.address + "/" + "createRoom"
 
 	// request options method

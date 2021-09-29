@@ -2,11 +2,12 @@ package main
 
 import (
 	"crypto/tls"
-	"github.com/google/uuid"
 	"hash/crc32"
 	"math/rand"
 	"net/http"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
@@ -48,54 +49,50 @@ func generateUserName(length int) string {
 
 type poolData struct{ buf []byte }
 
-func (p *poolData) reset() {
-	p.buf = p.buf[:0]
-}
-
 // slice pool
 // modify from https://github.com/golang/go/blob/c5c1d069da73a5e74bd2139ef1c7c14659915acd/src/net/http/h2_bundle.go#L1032
-var (
-	dataChunkSizeClasses = []int{
-		1 << 2,
-		2 << 2,
-		4 << 2,
-		8 << 2,
-		16 << 2,
-		32 << 2,
-		64 << 2,
-	}
-	dataChunkPools = [...]sync.Pool{
-		{New: func() interface{} { return make([]byte, 1<<2) }},
-		{New: func() interface{} { return make([]byte, 2<<2) }},
-		{New: func() interface{} { return make([]byte, 4<<2) }},
-		{New: func() interface{} { return make([]byte, 8<<2) }},
-		{New: func() interface{} { return make([]byte, 16<<2) }},
-		{New: func() interface{} { return make([]byte, 32<<2) }},
-		{New: func() interface{} { return make([]byte, 64<<2) }},
-	}
-)
+// var (
+// 	dataChunkSizeClasses = []int{
+// 		1 << 2,
+// 		2 << 2,
+// 		4 << 2,
+// 		8 << 2,
+// 		16 << 2,
+// 		32 << 2,
+// 		64 << 2,
+// 	}
+// 	dataChunkPools = [...]sync.Pool{
+// 		{New: func() interface{} { return make([]byte, 1<<2) }},
+// 		{New: func() interface{} { return make([]byte, 2<<2) }},
+// 		{New: func() interface{} { return make([]byte, 4<<2) }},
+// 		{New: func() interface{} { return make([]byte, 8<<2) }},
+// 		{New: func() interface{} { return make([]byte, 16<<2) }},
+// 		{New: func() interface{} { return make([]byte, 32<<2) }},
+// 		{New: func() interface{} { return make([]byte, 64<<2) }},
+// 	}
+// )
 
-func getDataBufferChunk(size int64) []byte {
-	i := 0
-	for ; i < len(dataChunkSizeClasses)-1; i++ {
-		if size <= int64(dataChunkSizeClasses[i]) {
-			break
-		}
-	}
-	p := dataChunkPools[i].Get().([]byte)
-	p = p[:0]
-	return p
-}
+// func getDataBufferChunk(size int64) []byte {
+// 	i := 0
+// 	for ; i < len(dataChunkSizeClasses)-1; i++ {
+// 		if size <= int64(dataChunkSizeClasses[i]) {
+// 			break
+// 		}
+// 	}
+// 	p := dataChunkPools[i].Get().([]byte)
+// 	p = p[:0]
+// 	return p
+// }
 
-func putDataBufferChunk(p []byte) {
-	for i, n := range dataChunkSizeClasses {
-		if cap(p) == n {
-			dataChunkPools[i].Put(p)
-			return
-		}
-	}
-	log.Fatalf("unexpected buffer len=%v", len(p))
-}
+// func putDataBufferChunk(p []byte) {
+// 	for i, n := range dataChunkSizeClasses {
+// 		if cap(p) == n {
+// 			dataChunkPools[i].Put(p)
+// 			return
+// 		}
+// 	}
+// 	log.Fatalf("unexpected buffer len=%v", len(p))
+// }
 
 // http transport pool
 

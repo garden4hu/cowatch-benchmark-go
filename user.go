@@ -26,9 +26,6 @@ func (p *roomUnit) usersConnection(start chan struct{}, ctx context.Context, wg 
 	if p.rm.parallelRequest {
 		defer wg.Done()
 	}
-	if p.users[0].connected == false {
-		// if users[0] is offline
-	}
 	// create users
 	var wg2 sync.WaitGroup // 用于并发请求，确保所有的 goroutine 同时发起请求，而不会出现开始并发请求时，有的 goroutine 还没有构造好 ws 句柄
 	for i := 1; i < p.usersCap; i++ {
@@ -44,7 +41,7 @@ func (p *roomUnit) usersConnection(start chan struct{}, ctx context.Context, wg 
 		time.Sleep(500 * time.Millisecond) // avoid concurrent
 	}
 	wg2.Wait()
-	if p.rm.parallelRequest == false {
+	if p.rm.parallelRequest {
 		time.Sleep(600 * time.Millisecond)
 	}
 }
@@ -81,7 +78,7 @@ func (user *userInfo) joinRoom(ctx context.Context, r *roomUnit, parallel bool, 
 		startJoin := time.Now()
 		conn, err := wsConnect(msgCtx, r, user)
 		if err == nil {
-			user.wsReqTimeOH = time.Now().Sub(startJoin)
+			user.wsReqTimeOH = time.Since(startJoin)
 			logIn.Debugln("goID:", user.id, " ws_req_time(ms):", user.wsReqTimeOH.Milliseconds())
 			go user.receiveMessage(conn, r, messageCh, cancel)
 			go user.sendMessage(conn, r, messageCh, r.msgSendingInternal, cancel)
@@ -124,10 +121,9 @@ func (user *userInfo) joinRoom(ctx context.Context, r *roomUnit, parallel bool, 
 				return
 			}
 			log.Infoln("reconnect websocket server successfully")
-			break
 		case <-user.expireTimer.C:
 			return
-		default:
+
 		}
 	}
 }
@@ -147,13 +143,10 @@ func wsConnect(ctx context.Context, r *roomUnit, p *userInfo) (*websocket.Conn, 
 	switch r.schema {
 	case "http":
 		u.Scheme = "ws"
-		break
 	case "https":
 		u.Scheme = "wss"
-		break
 	default:
 		u.Scheme = "wss"
-		break
 	}
 
 	//pool := &sync.Pool{New: func() interface{} {

@@ -26,11 +26,8 @@ type roomManager struct {
 	parallelRequest  bool
 	sdkVersion       string
 	notifyUsersAdd   <-chan int // chan 大小为 用户总数
-	notifyRoomAdd    <-chan int
 
 	notifyUserPingOK chan int
-
-	messagePool *sync.Pool
 
 	// Transport
 	tr *http.Transport
@@ -91,7 +88,7 @@ func (p *roomManager) requestAllRooms(ctx context.Context, when time.Time) error
 
 	for i := 0; i < p.roomSize; {
 		// all goroutines will send request in the same time
-		if p.parallelRequest == true {
+		if p.parallelRequest {
 			wg.Add(1)
 			go p.requestRoom(ctx, &wg, start)
 			i++
@@ -111,7 +108,7 @@ func (p *roomManager) requestAllRooms(ctx context.Context, when time.Time) error
 			time.Sleep(20 * time.Millisecond)
 		}
 	}
-	if p.parallelRequest == true && p.singleClientMode == 0 {
+	if p.parallelRequest && p.singleClientMode == 0 {
 		if p.singleClientMode == 0 { // 多台测试主机并发测试，需要等待特定时刻并发请求
 			now := time.Now()
 			if now.UnixNano() > when.UnixNano() {
@@ -123,7 +120,7 @@ func (p *roomManager) requestAllRooms(ctx context.Context, when time.Time) error
 
 	close(start) // 开始并发创建请求
 
-	if p.parallelRequest == true {
+	if p.parallelRequest {
 		wg.Wait()
 	} else {
 		for leftGoroutine != 0 {
@@ -132,10 +129,6 @@ func (p *roomManager) requestAllRooms(ctx context.Context, when time.Time) error
 	}
 	p.creatingRoomsOK = true
 	return nil
-}
-
-type transprotPool struct {
-	*http.Transport
 }
 
 func (p *roomManager) requestRoom(ctx context.Context, wg *sync.WaitGroup, start chan struct{}) {
