@@ -44,10 +44,10 @@ type roomUnit struct {
 }
 
 type userInfo struct {
-	name               string     // uuid of userInfo
-	sid                string     // correspond with name ns
-	uid                int        // digital id
-	lw                 sync.Mutex // lock for writing
+	name               string      // uuid of userInfo
+	sid                string      // correspond with name ns
+	uid                int         // digital id
+	lock               *sync.Mutex // lock for writing
 	connected          bool
 	readyForMsg        bool
 	connectionDuration time.Duration
@@ -57,8 +57,9 @@ type userInfo struct {
 	msgCtx             *context.Context
 	msgCancelFunc      context.CancelFunc
 
-	pingTimer *time.Ticker
+	room *roomUnit
 
+	messageTimer *time.Timer
 	// for debug
 	lastPing              time.Time
 	pingIntervalStartTime time.Duration

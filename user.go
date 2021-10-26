@@ -14,8 +14,11 @@ import (
 
 // newUser construct the user
 func newUser(p *roomUnit) *userInfo {
-	u := &userInfo{name: generateUserName(8), uid: getHostId(), hostCoWatch: false, connected: false, readyForMsg: false, expireTimer: time.NewTicker(24 * time.Hour), msgPool: p.msgPool}
+	u := &userInfo{uid: getHostId(), hostCoWatch: false, connected: false, readyForMsg: false, expireTimer: time.NewTicker(24 * time.Hour), msgPool: p.msgPool}
 	u.id = int(atomic.AddInt32(&gID, 1))
+	u.name = strconv.Itoa(u.id)
+	u.room = p
+	u.lock = &sync.Mutex{}
 	return u
 }
 
@@ -40,7 +43,7 @@ func (p *roomUnit) usersConnection(start chan struct{}, ctx context.Context, wg 
 				return newUser(p)
 			}
 		}()
-		go u.joinRoom(ctx, p, p.rm.parallelRequest, start, &wg2)
+		go joinRoom(ctx, p, u, p.rm.parallelRequest, start, &wg2)
 		time.Sleep(500 * time.Millisecond) // avoid concurrent
 	}
 	wg2.Wait()
@@ -50,14 +53,7 @@ func (p *roomUnit) usersConnection(start chan struct{}, ctx context.Context, wg 
 }
 
 // joinRoom join the room on the websocket server
-func (user *userInfo) joinRoom(ctx context.Context, r *roomUnit, parallel bool, start chan struct{}, wg *sync.WaitGroup) {
-	defer log.Infoln("goroutine exist")
-
-	defer func() {
-		if user.pingTimer != nil {
-			user.pingTimer.Stop()
-		}
-	}()
+func joinRoom(ctx context.Context, r *roomUnit, user *userInfo, parallel bool, start chan struct{}, wg *sync.WaitGroup) {
 	// if request users concurrently, goroutine should be waited
 	if wg != nil {
 		wg.Done() // create goroutine done
@@ -73,66 +69,31 @@ func (user *userInfo) joinRoom(ctx context.Context, r *roomUnit, parallel bool, 
 	r.users = append(r.users, user) // add user to room
 	r.muxUsers.Unlock()
 
-	messageCh := make(chan []byte)
-	defer close(messageCh)
-	user.pingTimer = time.NewTicker(60 * time.Second)
-	startWS := func() (context.Context, error) {
-		msgCtx, cancel := context.WithCancel(ctx)
-		startJoin := time.Now()
-		conn, err := wsConnect(msgCtx, r, user)
-		if err == nil {
-			user.wsReqTimeOH = time.Now().Sub(startJoin)
-			logIn.Debugln("goID:", user.id, " ws_req_time(ms):", user.wsReqTimeOH.Milliseconds())
-			go user.receiveMessage(conn, r, messageCh, cancel)
-			go user.sendMessage(conn, r, messageCh, r.msgSendingInternal, cancel)
-			user.connectionDuration = time.Since(startJoin)
-			return msgCtx, err
-		} else {
-			log.Errorln("failed to launch ws")
-			cancel()
-			return nil, err
-		}
+	startJoin := time.Now()
+	conn, err := createWsConn(ctx, user)
+	if err == nil {
+		user.wsReqTimeOH = time.Now().Sub(startJoin)
+		logIn.Debugln("goID:", user.id, " ws_req_time(ms):", user.wsReqTimeOH.Milliseconds())
+		go processMessageWorker(user, conn)
+		user.connectionDuration = time.Since(startJoin)
 	}
-
-	// 对于测试环境而言，host 发送的 sync 信息频次较高，故对于 host userInfo，需要考虑其发送频率
-	// 而对于 Guests, 其 websocket 消息内容更多为 text，ping/pong，这些消息频次较低
-	wsCTX, err := startWS()
-	if err != nil {
-		return
-	}
-	sendMsgTicker := time.NewTicker(r.msgSendingInternal)
-	defer sendMsgTicker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-wsCTX.Done():
-			// try to reconnect
-			r.rm.notifyUserAdd <- -1 // user offline
-			user.connected = false
-			i := 0
-			for ; i < 1; i++ {
-				wsCTX, err = startWS()
-				if err != nil {
-					continue
-				} else {
-					break
+	f := func() {
+		if user.connected {
+			if conn != nil {
+				user.lock.Lock()
+				e := conn.WriteMessage(websocket.TextMessage, generateMessage(r))
+				user.lock.Unlock()
+				if e == nil {
+					user.messageTimer.Reset(r.msgSendingInternal)
 				}
 			}
-			if i == 3 {
-				log.Errorln("failed to reconnect to websocket server")
-				return
-			}
-			log.Infoln("reconnect websocket server successfully")
-			break
-		case <-user.expireTimer.C:
-			return
-		default:
 		}
 	}
+	user.messageTimer = time.AfterFunc(r.msgSendingInternal, f) // start a schedule message timer
 }
 
-func wsConnect(ctx context.Context, r *roomUnit, p *userInfo) (*websocket.Conn, error) {
+func createWsConn(ctx context.Context, p *userInfo) (*websocket.Conn, error) {
+	r := p.room
 	// set ws/wss url param
 	v := url.Values{}
 	v.Add("uid", strconv.Itoa(p.uid))

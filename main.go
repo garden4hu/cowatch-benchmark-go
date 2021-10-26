@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"io/ioutil"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -117,6 +118,12 @@ var webSocketRunningDuration *time.Ticker
 var onlineUserPingOK int
 
 func main() {
+
+	// debug
+	go func() {
+		log.Println(http.ListenAndServe("localhost:16060", nil))
+	}()
+
 	defer func() {
 		if inlog != os.Stdout && inlog != os.Stderr {
 			inlog.Close()
@@ -165,6 +172,9 @@ func main() {
 		log.Errorln(e.Error())
 		return
 	}
+
+	initGlobal() // init global variables
+
 	rm = newRoomManager(configure)
 	processExtraHttpData(rm, configure)
 	defer rm.Close()
@@ -292,6 +302,9 @@ func processExtraHttpData(rm *roomManager, conf *Config) {
 		default:
 		}
 	}
+}
+
+func initGlobal() {
 }
 
 type Config struct {

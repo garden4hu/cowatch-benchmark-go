@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -126,7 +127,7 @@ func (p *roomUnit) request(ctx context.Context) error {
 	}).Debugln("created room ok")
 	// Note: 房间创建完成后，即产生第一个 userInfo， 也是 Address
 	userHost := newUser(p)
-	userHost.name = generateUserName(8)
+	userHost.name = strconv.Itoa(userHost.id)
 	userHost.hostCoWatch = true
 	userHost.uid = roomId
 	userHost.expireTimer = time.NewTicker(24 * time.Hour)
@@ -136,7 +137,7 @@ func (p *roomUnit) request(ctx context.Context) error {
 	p.rm.lockRoom.Lock()
 	p.rm.Rooms = append(p.rm.Rooms, p)
 	p.rm.lockRoom.Unlock()
-	go p.users[0].joinRoom(ctx, p, false, nil, nil)
+	go joinRoom(ctx, p, p.users[0], false, nil, nil)
 	return nil
 }
 
@@ -175,4 +176,9 @@ func (p *roomUnit) preRequest() {
 	// put transport
 	putTransport(tr)
 	// 如果 err != nil 则不能 close body，此处可以省略
+}
+
+// doesn't deploy it now
+func usersOnlineGuard() {
+
 }

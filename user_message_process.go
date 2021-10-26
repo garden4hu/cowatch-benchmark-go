@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"github.com/gorilla/websocket"
@@ -11,80 +10,42 @@ import (
 	"time"
 )
 
-// receiveMessage
-func (user *userInfo) receiveMessage(conn *websocket.Conn, room *roomUnit, rdata chan []byte, cancel context.CancelFunc) {
+// processMessageWorker
+func processMessageWorker(user *userInfo, conn *websocket.Conn) {
 	defer logIn.Debugln("goID:", user.id, " receiving goroutine exit")
 	defer func() {
-		cancel()
 		time.Sleep(100 * time.Millisecond) // waiting writing goroutine exit
 		_ = conn.Close()
+		user.room.rm.notifyUserAdd <- -1 // user offline
+		user.connected = false
+		conn = nil
 	}()
 
 	for {
 		// Read data
 		_, message, err := conn.ReadMessage()
 		if err != nil {
-			logIn.Errorln("goID:", user.id, " websocket read message error:", err)
+			logIn.Warnln("goID:", user.id, " websocket read message error:", err)
 			return
 		} else {
-			reply, err := user.processResponse(message, room)
+			reply, err := processResponse(user, message, user.room)
 			if err != nil {
-				return
-			} else {
-				if len(reply) != 0 {
-					rdata <- reply
+				log.Errorln("goID:", user.id, " failed to process message: ", string(message))
+			}
+			if len(reply) > 0 {
+				user.lock.Lock()
+				err := conn.WriteMessage(websocket.TextMessage, reply)
+				user.lock.Unlock()
+				if err != nil {
+					log.Errorln("goID:", user.id, " failed to write ws connection")
+					return
 				}
 			}
 		}
 	}
 }
 
-func (user *userInfo) sendMessage(conn *websocket.Conn, room *roomUnit, rdata chan []byte, messageInternal time.Duration, cancel context.CancelFunc) {
-	defer logOut.Debugln("sending goroutine exit")
-	sendMsgTicker := time.NewTicker(messageInternal)
-	sendClockSyncTicker := time.NewTicker(1 * time.Minute)
-	defer sendMsgTicker.Stop()
-	defer sendClockSyncTicker.Stop()
-	defer func() {
-		cancel()
-		time.Sleep(100 * time.Millisecond) // waiting writing goroutine exit
-		_ = conn.Close()
-	}()
-	for {
-		select {
-		case b := <-rdata:
-			logOut.Debugln("goID:", user.id, " client outgoing message: ", string(b))
-			err := conn.WriteMessage(websocket.TextMessage, b)
-			if err != nil {
-				logOut.Errorln("goID:", user.id, " write to ws error :", err)
-				return
-			}
-		case <-sendMsgTicker.C:
-			err := conn.WriteMessage(websocket.TextMessage, generateMessage(room))
-			if err != nil {
-				logOut.Errorln("goID:", user.id, " write to ws error :", err)
-				return
-			} else {
-				sendMsgTicker.Reset(messageInternal)
-			}
-		case <-sendClockSyncTicker.C:
-			err := conn.WriteMessage(websocket.TextMessage, user.generateClockSyncMessage(room))
-			if err != nil {
-				logOut.Errorln("goID:", user.id, " write to ws error :", err)
-				cancel()
-				return
-			} else {
-				sendMsgTicker.Reset(messageInternal)
-			}
-		case <-user.pingTimer.C: // if ping/pong ok, this ticker will be never triggered
-			room.rm.notifyUserPingOK <- -1
-			logOut.Warnln("goID:", user.id, " still not has normal ping/pong. WARN")
-		default:
-		}
-	}
-}
-
-func (user *userInfo) processResponse(b []byte, room *roomUnit) (msg []byte, err error) {
+func processResponse(user *userInfo, b []byte, room *roomUnit) (msg []byte, err error) {
 	log.Debugln("goID:", user.id, " client incoming message: ", string(b))
 	b = bytes.TrimSpace(b)
 	if len(b) == 0 {
@@ -94,31 +55,30 @@ func (user *userInfo) processResponse(b []byte, room *roomUnit) (msg []byte, err
 	v := engineIOV4Type(t)
 	switch v {
 	case engineTypeOPEN:
-		msg, err = user.onEngineOpen(b, room)
+		msg, err = onEngineOpen(user, b, room)
 		if err != nil || len(msg) == 0 {
 			log.Errorln("goID:", user.id, " replay generate error, msg")
 		}
 	case engineTypePING: // ping of engineIO
-		user.pingTimer.Reset(time.Duration(35) * time.Second) // reset the ping/pong ticker
 		logIn.Debugln("goID:", user.id, " ping_pong")
 		msg = []byte("3")
 		return msg, nil
 	case engineTypeMESSAGE:
-		msg, err = user.processSocketIO(b[1:], room)
+		msg, err = processSocketIO(user, b[1:], room)
 	default:
 	}
 	return
 }
 
-func (user *userInfo) processSocketIO(b []byte, room *roomUnit) (msg []byte, err error) {
+func processSocketIO(user *userInfo, b []byte, room *roomUnit) (msg []byte, err error) {
 	t, _ := strconv.Atoi(string(b[0]))
 	switch socketIOV4Type(t) {
 	case socketTypeCONNECT: // socket.io CONNECT
-		user.onSocketIOConnect(b)
+		onSocketIOConnect(user, b)
 	case socketTypeDISCONNECT:
 		err = errors.New("error: socket finish")
 	case socketTypeEVENT:
-		msg, err = user.onSocketIOEvent(b, room)
+		msg, err = onSocketIOEvent(user, b, room)
 	case socketTypeACK:
 	case socketTypeBINARYACK:
 		// unsupported
@@ -129,9 +89,8 @@ func (user *userInfo) processSocketIO(b []byte, room *roomUnit) (msg []byte, err
 	return msg, err
 }
 
-func (user *userInfo) onEngineOpen(b []byte, room *roomUnit) (msg []byte, err error) {
+func onEngineOpen(user *userInfo, b []byte, room *roomUnit) (msg []byte, err error) {
 	// reset the pint ticker
-	user.pingTimer.Reset(35 * time.Second)
 	log.Debugln("goID:", user.id, " Received EngineIO Open event")
 	u := new(requestedUserInfo)
 	err = json.Unmarshal(b[1:], u)
@@ -144,7 +103,7 @@ func (user *userInfo) onEngineOpen(b []byte, room *roomUnit) (msg []byte, err er
 	logIn.Debugln("goID:", user.id, " ping interval is :", room.pingInterval, " ping timeout  is :", u.PingInterval)
 	room.pingTimeout = u.PingTimeOut
 
-	msg = user.generateConnectAndDisconnectMessage(socketTypeCONNECT, room.ns)
+	msg = generateConnectAndDisconnectMessage(socketTypeCONNECT, room.ns)
 	log.Debugln("goID:", user.id, " process EngineIO Open event: response msg:", string(msg))
 
 	// notify
@@ -154,7 +113,7 @@ func (user *userInfo) onEngineOpen(b []byte, room *roomUnit) (msg []byte, err er
 	return msg, err
 }
 
-func (user *userInfo) onSocketIOConnect(b []byte) {
+func onSocketIOConnect(user *userInfo, b []byte) {
 	i := 0
 	for ; i < len(b); i++ {
 		if b[i] == 0x2C {
@@ -181,7 +140,7 @@ type clientTime struct {
 	ClientTime int64 `json:"clientTime"`
 }
 
-func (user *userInfo) onSocketIOEvent(b []byte, room *roomUnit) (msg []byte, err error) {
+func onSocketIOEvent(user *userInfo, b []byte, room *roomUnit) (msg []byte, err error) {
 	data := getData(b)
 	vs := strings.Split(string(data), ",")
 	var cmd string
@@ -204,12 +163,12 @@ func (user *userInfo) onSocketIOEvent(b []byte, room *roomUnit) (msg []byte, err
 		room.rm.notifyUserAdd <- 1 // user online
 		user.connected = true
 		logIn.Debugln("goID:", user.id, " get roster, connected")
-		msg = user.generateClockSyncMessage(room)
+		msg = generateClockSyncMessage(user, room)
 	case "REC:userAdded":
 		// received user added info
 	case "REC:clockSync":
 		// received clockSync
-		msg = user.generateClockSyncMessage(room)
+		msg = generateClockSyncMessage(user, room)
 	default:
 
 	}
@@ -250,11 +209,11 @@ func generateMessage(r *roomUnit) []byte {
 	return []byte(msg)
 }
 
-func (user *userInfo) generateClockSyncMessage(r *roomUnit) []byte {
+func generateClockSyncMessage(user *userInfo, r *roomUnit) []byte {
 	ct := new(clientTime)
 	ct.ClientTime = time.Now().UnixMilli()
 	buf, _ := json.Marshal(ct)
-	return user.generateEventMessage(r.ns, nil, "REC:clockSync", buf)
+	return generateEventMessage(r.ns, nil, "REC:clockSync", buf)
 }
 
 type engineIOV4Type int8
@@ -329,7 +288,7 @@ func generateMsgBody(msgCMD string, body []byte) string {
 	return "[" + string(b) + "," + string(body) + "]"
 }
 
-func (user *userInfo) generateConnectAndDisconnectMessage(n socketIOV4Type, ns string) []byte {
+func generateConnectAndDisconnectMessage(n socketIOV4Type, ns string) []byte {
 	log.Debugln("generate Open msg, ns: ", ns)
 	if ns != "" {
 		ns = "/" + ns
@@ -343,7 +302,7 @@ func (user *userInfo) generateConnectAndDisconnectMessage(n socketIOV4Type, ns s
 	}
 	return []byte(s + ns + ",")
 }
-func (user *userInfo) generateEventMessage(ns string, id *int, msgCMD string, body []byte) []byte {
+func generateEventMessage(ns string, id *int, msgCMD string, body []byte) []byte {
 	if ns != "" {
 		ns = "/" + ns
 	}
@@ -355,7 +314,7 @@ func (user *userInfo) generateEventMessage(ns string, id *int, msgCMD string, bo
 
 }
 
-func (user *userInfo) generateACKMessage(ns string, id int, data string) []byte {
+func generateACKMessage(ns string, id int, data string) []byte {
 	if ns != "" {
 		ns = "/" + ns
 	}
@@ -363,7 +322,7 @@ func (user *userInfo) generateACKMessage(ns string, id int, data string) []byte 
 	return []byte("43" + ns + "," + strconv.Itoa(id) + data)
 }
 
-func (user *userInfo) generateERRORMessage(ns string, data string) []byte {
+func generateERRORMessage(ns string, data string) []byte {
 	if ns != "" {
 		ns = "/" + ns
 	}

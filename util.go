@@ -17,6 +17,8 @@ func getUUID() string {
 }
 
 // randStringBytes generate a string with length n
+// To avoid waste cpu, it will return alpha beta.
+
 func randStringBytes(n int) string {
 	b := make([]byte, n)
 	for i := range b {
@@ -39,11 +41,6 @@ func getHostId() int {
 		return 0
 	}
 	return customHash(getUUID())
-}
-
-// generateUserName generate a user name
-func generateUserName(length int) string {
-	return randStringBytes(length)
 }
 
 type poolData struct{ buf []byte }
