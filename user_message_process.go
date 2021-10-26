@@ -20,8 +20,22 @@ func processMessageWorker(user *userInfo, conn *websocket.Conn) {
 		user.connected = false
 		conn = nil
 	}()
-
+	timeStampPlayBackMessage := time.Now()
 	for {
+		if user.hostCoWatch {
+			if time.Since(timeStampPlayBackMessage) > 2*time.Minute {
+				pb := []byte("42/" + user.room.ns)
+				pb = append(pb, []byte(",[\"CMD:contentInfo\",{\"video\":{\"links\":[{\"uri\":\"https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd\",\"type\":\"progressive\"}],\"advanced\":{\"presentationDelay\":3000}}}]")...)
+				user.lock.Lock()
+				err := conn.WriteMessage(websocket.TextMessage, pb)
+				user.lock.Unlock()
+				if err != nil {
+					log.Errorln("goID:", user.id, " failed to write ws connection playback message")
+					return
+				}
+				timeStampPlayBackMessage = time.Now()
+			}
+		}
 		// Read data
 		_, message, err := conn.ReadMessage()
 		if err != nil {
