@@ -101,7 +101,7 @@ func (p *roomManager) requestAllRooms(ctx context.Context, when time.Time) error
 				// go p.RequestRoom()
 				go func() {
 					r := newRoom(p.addr, p.httpTimeout, p.websocketTimeout, p.userSize, p.messageLength, p.frequency, p.appID, p)
-					_ = r.request(ctx)
+					_ = r.requestCreateRoom(ctx)
 					mtx.Lock()
 					leftGoroutine -= 1
 					mtx.Unlock()
@@ -146,5 +146,5 @@ func (p *roomManager) requestRoom(ctx context.Context, wg *sync.WaitGroup, start
 	if p.parallelRequest {
 		<-start // 需要等待
 	}
-	_ = r.request(ctx)
+	_ = r.requestCreateRoom(ctx)
 }

@@ -23,15 +23,15 @@ func printLogMessage(roomManager *roomManager) {
 	addedUsers := onlineUser - analytics.lastOnlineUsers
 	total := len(roomManager.Rooms) * roomManager.userSize
 	logA.WithFields(logrus.Fields{
-		"已创建房间":          roomSize,
-		"room比例":         roomSize * 100 / roomManager.roomSize,
-		"http请求平均耗时":     roomManager.GetCreatingRoomAvgDuration().Seconds(),
-		"用户在线数":          onlineUser,
-		"user在线比例":       onlineUser * 100 / (total),
-		"user_ping正常数":   onlineUserPingOK,
-		"ws创建平均耗时":       roomManager.GetCreatingRoomAvgDuration().Seconds(),
-		"新增用户数":          addedUsers,
-		"当前总的 transport": totalTransport,
+		"已创建房间":                roomSize,
+		"room比例":               roomSize * 100 / roomManager.roomSize,
+		"http cost(ms)":        roomManager.GetCreatingRoomAvgDuration().Milliseconds(),
+		"用户在线数":                onlineUser,
+		"user在线比例":             onlineUser * 100 / (total),
+		"user_ping正常数":         onlineUserPingOK,
+		"ws cost(ms)":          roomManager.GetCreatingRoomAvgDuration().Milliseconds(),
+		"新增用户数":                addedUsers,
+		"total http transport": totalTransport,
 	}).Println()
 
 	analytics.lastSecondRooms = roomSize

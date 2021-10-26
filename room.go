@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,11 +34,19 @@ func newRoom(host string, httpTimeout, wsTimeout time.Duration, maximumUsers, ms
 		pd.buf = make([]byte, 4096)
 		return pd
 	}}
+
+	for i := 0; i < room.usersCap; i++ {
+		u := newUser(room)
+		if i == 0 {
+			u.hostCoWatch = true
+		}
+		room.users = append(room.users, u)
+	}
 	return room
 }
 
-// request is that the roomUnit try to create a room on the server
-func (p *roomUnit) request(ctx context.Context) error {
+// requestCreateRoom is that the roomUnit try to create a room on the server
+func (p *roomUnit) requestCreateRoom(ctx context.Context) error {
 	strings.TrimSuffix(p.address, "/")
 	uri := p.schema + "://" + p.address + "/" + "createRoom"
 
@@ -126,23 +133,22 @@ func (p *roomUnit) request(ctx context.Context) error {
 		"roomId":    roomId,
 	}).Debugln("created room ok")
 	// Note: 房间创建完成后，即产生第一个 userInfo， 也是 Address
-	userHost := newUser(p)
-	userHost.name = strconv.Itoa(userHost.id)
-	userHost.hostCoWatch = true
-	userHost.uid = roomId
-	userHost.expireTimer = time.NewTicker(24 * time.Hour)
-	p.users = append(p.users, userHost)
+	//userHost := newUser(p)
+	//userHost.hostCoWatch = true
+	//userHost.uid = roomId
+	//userHost.expireTimer = time.NewTicker(24 * time.Hour)
+	//p.users = append(p.users, userHost)
 
 	// add room to rm
 	p.rm.lockRoom.Lock()
 	p.rm.Rooms = append(p.rm.Rooms, p)
 	p.rm.lockRoom.Unlock()
-	go joinRoom(ctx, p, p.users[0], false, nil, nil)
+	// go joinRoom(ctx, p, p.users[0], false, nil, nil)
 	return nil
 }
 
 // preRequest is used for fetch method.
-// for some version, it maybe has options method to request
+// for some version, it maybe has options method to requestCreateRoom
 func (p *roomUnit) preRequest() {
 	strings.TrimSuffix(p.address, "/")
 	uri := p.schema + "://" + p.address + "/" + "createRoom"

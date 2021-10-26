@@ -65,29 +65,74 @@ func getUsers(conf *Config, ctx context.Context) error {
 	ch := make(chan struct{})
 	if conf.ParallelMode == 0 {
 		for i := 0; i < len(rm.Rooms); i++ {
-			go rm.Rooms[i].usersConnection(ch, ctx, nil)
+			go usersConnection(rm.Rooms[i], ch, ctx, nil)
 			time.Sleep(15 * time.Millisecond)
 		}
 	} else if conf.ParallelMode == 1 {
 		var wg sync.WaitGroup // Wait for the websocket handles of all users in the same room to be constructed
 		for i := 0; i < len(rm.Rooms); i++ {
 			wg.Add(1)
-			go rm.Rooms[i].usersConnection(ch, ctx, &wg)
+			go usersConnection(rm.Rooms[i], ch, ctx, &wg)
 			wg.Wait()
 		}
 	} else if conf.ParallelMode == 2 {
-		// 以秒为单位创建ws
-		if conf.UsersPerRoom > 0 && conf.WsReqConcurrency >= 0 {
-			for i := 0; i < len(rm.Rooms); {
-				now := time.Now()
-				for j := i; j < i+conf.WsReqConcurrency && j < len(rm.Rooms); j++ {
-					go rm.Rooms[j].usersConnection(ch, ctx, nil)
-				}
-				i += conf.WsReqConcurrency
-				if 1*time.Second > time.Since(now) {
-					time.Sleep(1*time.Second - time.Since(now))
-				}
+		// 以秒为单位创建 ws, 采取动态的方式增加/降低创建 websocket 的速度
+		// 策略: 在 1s 内实现当前设置的目标连接数 n ，则 n x 1.35;
+		// 如果在 1s 内没有实现目标链接，则 n / 1.15。（经验值）
+		// 从 n == len(room.users) 开始
+		roomIndex := 0
+		userIndex := 0
+		fetchUser := func() *userInfo {
+			if userIndex == conf.UsersPerRoom {
+				userIndex = 0
+				roomIndex++
 			}
+			if roomIndex == conf.Rooms {
+				return nil
+			}
+			u := rm.Rooms[roomIndex].users[userIndex]
+			userIndex++
+			return u
+		}
+
+		joinRoomBatch := func(ctx context.Context, n int) (d time.Duration, e error) {
+			now := time.Now()
+			defer func() {
+				d = time.Since(now)
+			}()
+			var wg sync.WaitGroup
+			for i := 0; i < n; i++ {
+				user := fetchUser()
+				if user == nil {
+					return 0, errors.New("no user left")
+				}
+				wg.Add(1)
+				go func() {
+					joinRoom(ctx, user)
+					wg.Done()
+				}()
+			}
+			wg.Wait()
+			return
+		}
+
+		base := conf.UsersPerRoom
+		lastDuration := 0 * time.Millisecond
+		for {
+			d, e := joinRoomBatch(ctx, base)
+			if e != nil { // means that there is no more user to create connection
+				break
+			}
+			if d.Milliseconds() != 0 && base != 0 {
+				log.Infof("join room in batch, size: %d, duration(ms):%d\n", base, d.Milliseconds())
+			}
+			if d < lastDuration {
+				base = int(float32(base)*1.4) + 1
+			} else {
+				base = int(float32(base) / 1.15)
+			}
+			lastDuration = d
+
 		}
 	}
 

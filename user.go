@@ -25,35 +25,41 @@ func newUser(p *roomUnit) *userInfo {
 // usersConnection try to connect to the server and exchange message.
 // param when is the time for requesting of websocket concurrently
 // param mode is the mode for requesting. 0 means parallel and 1 means serial
-func (p *roomUnit) usersConnection(start chan struct{}, ctx context.Context, wg *sync.WaitGroup) {
+func usersConnection(p *roomUnit, start chan struct{}, ctx context.Context, wg *sync.WaitGroup) {
 	if p.rm.parallelRequest {
 		defer wg.Done()
 	}
-	if p.users[0].connected == false {
-		// if users[0] is offline
-	}
+
 	// create users
 	var wg2 sync.WaitGroup // 用于并发请求，确保所有的 goroutine 同时发起请求，而不会出现开始并发请求时，有的 goroutine 还没有构造好 ws 句柄
-	for i := 1; i < p.usersCap; i++ {
-		wg2.Add(1)
-		u := func() *userInfo {
-			if i == 0 {
-				return p.users[0]
-			} else {
-				return newUser(p)
-			}
-		}()
-		go joinRoom(ctx, p, u, p.rm.parallelRequest, start, &wg2)
-		time.Sleep(500 * time.Millisecond) // avoid concurrent
+	for i := 0; i < p.usersCap; i++ {
+		if p.rm.parallelRequest {
+			wg2.Add(1)
+		}
+		user := p.users[i]
+		if p.rm.parallelRequest {
+			// go userJoinRoom(ctx, u, p.rm.parallelRequest, start, &wg2)
+			go func() {
+				if wg != nil {
+					wg.Done() // create goroutine done
+				}
+				if start != nil {
+					<-start // waiting for starting
+				}
+				joinRoom(ctx, user)
+			}()
+		} else {
+			joinRoom(ctx, user)
+		}
 	}
-	wg2.Wait()
-	if p.rm.parallelRequest == false {
-		time.Sleep(600 * time.Millisecond)
+
+	if p.rm.parallelRequest {
+		wg2.Wait()
 	}
 }
 
-// joinRoom join the room on the websocket server
-func joinRoom(ctx context.Context, r *roomUnit, user *userInfo, parallel bool, start chan struct{}, wg *sync.WaitGroup) {
+// userJoinRoom join the room on the websocket server
+func userJoinRoom(ctx context.Context, user *userInfo, parallel bool, start chan struct{}, wg *sync.WaitGroup) {
 	// if request users concurrently, goroutine should be waited
 	if wg != nil {
 		wg.Done() // create goroutine done
@@ -64,11 +70,10 @@ func joinRoom(ctx context.Context, r *roomUnit, user *userInfo, parallel bool, s
 		}
 	}
 
-	// add user to roomUnit
-	r.muxUsers.Lock()
-	r.users = append(r.users, user) // add user to room
-	r.muxUsers.Unlock()
+}
 
+func joinRoom(ctx context.Context, user *userInfo) {
+	r := user.room
 	startJoin := time.Now()
 	conn, err := createWsConn(ctx, user)
 	if err == nil {
