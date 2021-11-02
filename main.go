@@ -325,4 +325,5 @@ type Config struct {
 	SDKVersion          string      `json:"sdk_version"`
 	CreateRoomExtraData interface{} `json:"createRoomExtraData"` // the extra data which post to the server
 	HttpHeaderExtra     interface{} `json:"http_header"`
+	Video               Video       `json:"video"`
 }

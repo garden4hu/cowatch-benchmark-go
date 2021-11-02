@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"sync"
@@ -35,6 +36,9 @@ type roomManager struct {
 	// Transport
 	tr *http.Transport
 
+	// playback assets
+
+	playBackContent string
 	// for internal usage
 	notifyUserAdd            chan int
 	creatingRoomsOK          bool
@@ -54,6 +58,11 @@ func newRoomManager(conf *Config) *roomManager {
 	rm.notifyUsersAdd = rm.notifyUserAdd
 	rm.finishedReqRoomRoutines = 0
 	rm.finishedReqUsersRoutines = 0
+	var playBackAsset ContentInfo
+	playBackAsset.Videos = conf.Video
+	if asset, err := json.Marshal(playBackAsset); err == nil {
+		rm.playBackContent = string(asset)
+	}
 	tr := &http.Transport{}
 	rm.tr = tr
 	pingChannelSize := func() int {

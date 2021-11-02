@@ -78,3 +78,20 @@ type requestedUserInfo struct {
 type roomInfo struct {
 	Name string `json:"name"`
 }
+
+type VideoAdvanced struct {
+	PresentationDelay int `json:"presentationDelay"`
+}
+type VideoLink struct {
+	Uri  string `json:"uri"`
+	Type string `json:"type"`
+}
+
+type Video struct {
+	Advanced VideoAdvanced `json:"advanced"`
+	Links    []VideoLink   `json:"links"`
+}
+
+type ContentInfo struct {
+	Videos Video `json:"video"`
+}
