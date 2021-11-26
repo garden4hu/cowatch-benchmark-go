@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/gorilla/websocket"
 	"strconv"
 	"strings"
@@ -24,9 +23,8 @@ func processMessageWorker(user *userInfo, conn *websocket.Conn) {
 	timeStampPlayBackMessage := time.Now()
 	for {
 		if user.hostCoWatch {
-			if time.Since(timeStampPlayBackMessage) > 2*time.Minute {
+			if time.Since(timeStampPlayBackMessage) > 10*time.Minute {
 				pbStr := "42/" + user.room.ns + ",[\"CMD:contentInfo\"," + user.room.rm.playBackContent + "]"
-				fmt.Println("sending playback asset : ", pbStr)
 				pb := []byte(pbStr)
 				user.lock.Lock()
 				err := conn.WriteMessage(websocket.TextMessage, pb)

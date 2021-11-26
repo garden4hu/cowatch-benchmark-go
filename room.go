@@ -39,6 +39,7 @@ func newRoom(host string, httpTimeout, wsTimeout time.Duration, maximumUsers, ms
 		u := newUser(room)
 		if i == 0 {
 			u.hostCoWatch = true
+			u.uid = room.roomId
 		}
 		room.users = append(room.users, u)
 	}
@@ -59,7 +60,7 @@ func (p *roomUnit) requestCreateRoom(ctx context.Context) error {
 	for k, v := range rm.createRoomExtraData {
 		bd[k] = v
 	}
-	bd["hostUid"] = fmt.Sprintf("%d", getHostId())
+	bd["hostUid"] = fmt.Sprintf("%d", roomId)
 	bd["appId"] = p.appId
 	bd["version"] = p.sdkVersion
 	s, e := json.Marshal(bd)
@@ -123,7 +124,7 @@ func (p *roomUnit) requestCreateRoom(ctx context.Context) error {
 		log.Errorln("create room: parsed response failed, response data:", string(roomRaw))
 		return err
 	} else if room.Name == "" {
-		log.Errorln("create room: response is not wanted")
+		logA.Errorln("create room: response is not wanted, response body: ", string(roomRaw))
 		return err
 	}
 	p.ns = room.Name

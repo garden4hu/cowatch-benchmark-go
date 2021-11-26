@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -95,8 +96,8 @@ func (p *roomManager) requestAllRooms(ctx context.Context, when time.Time) error
 	start := make(chan struct{})
 
 	// for serial request
-	mtx := sync.Mutex{}
-	leftGoroutine := p.roomSize
+	var leftGoroutine int32
+	atomic.StoreInt32(&leftGoroutine, int32(p.roomSize))
 
 	for i := 0; i < p.roomSize; {
 		// all goroutines will send request in the same time
@@ -111,9 +112,10 @@ func (p *roomManager) requestAllRooms(ctx context.Context, when time.Time) error
 				go func() {
 					r := newRoom(p.addr, p.httpTimeout, p.websocketTimeout, p.userSize, p.messageLength, p.frequency, p.appID, p)
 					_ = r.requestCreateRoom(ctx)
-					mtx.Lock()
-					leftGoroutine -= 1
-					mtx.Unlock()
+					//mtx.Lock()
+					//leftGoroutine -= 1
+					//mtx.Unlock()
+					atomic.AddInt32(&leftGoroutine, -1)
 				}()
 			}
 			i += 8

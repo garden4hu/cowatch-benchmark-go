@@ -55,59 +55,8 @@ func init() {
 	onlineUser = 0
 	analytics = new(statistic)
 	webSocketRunningDuration = time.NewTicker(1 * time.Hour)
-	logF.Formatter = &logrus.JSONFormatter{}
-	log.Formatter = &logrus.TextFormatter{
-		ForceColors:   true,
-		FullTimestamp: true,
-	}
-	logA.Formatter = &logrus.TextFormatter{
-		ForceColors: true,
-	}
-
-	logIn.Formatter = &logrus.TextFormatter{
-		FullTimestamp: true,
-	}
-	logOut.Formatter = &logrus.TextFormatter{
-		FullTimestamp: true,
-	}
-	workDir := filepath.Dir(os.Args[0])
-	infile := filepath.Join(workDir, "in.log")
-	if fs.ValidPath(infile) {
-		_ = os.Remove(infile)
-	}
-	outfile := filepath.Join(workDir, "out.log")
-	if fs.ValidPath(outfile) {
-		_ = os.Remove(outfile)
-	}
-	inHandler, err := os.Create(infile)
-	if err == nil {
-		inlog = inHandler
-	} else {
-		inHandler = os.Stdout
-	}
-	outHandler, err := os.Create(outfile)
-	if err == nil {
-		outlog = outHandler
-	} else {
-		outHandler = os.Stdout
-	}
-
-	logIn.SetOutput(inHandler)
-	logOut.SetOutput(outHandler)
-	logIn.SetLevel(logrus.DebugLevel)
-	logOut.SetLevel(logrus.DebugLevel)
-
-	log.SetReportCaller(true)
-	log.SetOutput(os.Stderr)
-	logF.SetOutput(os.Stdout)
-	logA.SetOutput(os.Stdout)
-	log.SetLevel(logrus.InfoLevel)
-	logF.SetLevel(logrus.InfoLevel)
-	logF.SetLevel(logrus.InfoLevel)
-	if *verbose == true {
-		log.SetLevel(logrus.DebugLevel)
-		logF.SetLevel(logrus.DebugLevel)
-	}
+	initLog()
+	exitFlag = make(chan bool)
 }
 
 var rm *roomManager
@@ -116,6 +65,8 @@ var analytics *statistic
 var webSocketRunningDuration *time.Ticker
 
 var onlineUserPingOK int
+
+var exitFlag chan bool
 
 func main() {
 
@@ -173,8 +124,6 @@ func main() {
 		return
 	}
 
-	initGlobal() // init global variables
-
 	rm = newRoomManager(configure)
 	processExtraHttpData(rm, configure)
 	defer rm.Close()
@@ -196,7 +145,7 @@ func main() {
 		// create room
 		select {
 		case <-interrupt:
-			log.Warnln("interrupt by user")
+			logA.Warnln("interrupt by user")
 			// Cleanly close the connection by sending a close message and then
 			// waiting (with timeout) for the server to close the connection.
 
@@ -214,8 +163,13 @@ func main() {
 			break
 		case <-webSocketRunningDuration.C:
 			webSocketRunningDuration.Stop()
-			log.Warnln("The program exits at time")
+			logA.Warnln("The program exits at time")
 			return
+		case <-exitFlag:
+			logA.Errorln("encounter an error, and exit")
+			return
+		default:
+			break
 		}
 	}
 }
@@ -304,7 +258,60 @@ func processExtraHttpData(rm *roomManager, conf *Config) {
 	}
 }
 
-func initGlobal() {
+func initLog() {
+	logF.Formatter = &logrus.JSONFormatter{}
+	log.Formatter = &logrus.TextFormatter{
+		ForceColors:   true,
+		FullTimestamp: true,
+	}
+	logA.Formatter = &logrus.TextFormatter{
+		ForceColors: true,
+	}
+
+	logIn.Formatter = &logrus.TextFormatter{
+		FullTimestamp: true,
+	}
+	logOut.Formatter = &logrus.TextFormatter{
+		FullTimestamp: true,
+	}
+	workDir := filepath.Dir(os.Args[0])
+	infile := filepath.Join(workDir, "in.log")
+	if fs.ValidPath(infile) {
+		_ = os.Remove(infile)
+	}
+	outfile := filepath.Join(workDir, "out.log")
+	if fs.ValidPath(outfile) {
+		_ = os.Remove(outfile)
+	}
+	inHandler, err := os.Create(infile)
+	if err == nil {
+		inlog = inHandler
+	} else {
+		inHandler = os.Stdout
+	}
+	outHandler, err := os.Create(outfile)
+	if err == nil {
+		outlog = outHandler
+	} else {
+		outHandler = os.Stdout
+	}
+
+	logIn.SetOutput(inHandler)
+	logOut.SetOutput(outHandler)
+	logIn.SetLevel(logrus.DebugLevel)
+	logOut.SetLevel(logrus.DebugLevel)
+
+	log.SetReportCaller(true)
+	log.SetOutput(os.Stderr)
+	logF.SetOutput(os.Stdout)
+	logA.SetOutput(os.Stdout)
+	log.SetLevel(logrus.InfoLevel)
+	logF.SetLevel(logrus.InfoLevel)
+	logF.SetLevel(logrus.InfoLevel)
+	if *verbose == true {
+		log.SetLevel(logrus.DebugLevel)
+		logF.SetLevel(logrus.DebugLevel)
+	}
 }
 
 type Config struct {

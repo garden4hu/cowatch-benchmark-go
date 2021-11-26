@@ -30,6 +30,11 @@ func NonInstanceLoading(conf *Config, ctx context.Context) {
 		log.Errorln("not yet create room ok")
 		time.Sleep(1 * time.Second)
 	}
+	if len(rm.Rooms) == 0 {
+		logA.Errorln("No room created, program will be stopped")
+		exitFlag <- true
+		return
+	}
 	webSocketRunningDuration.Reset(time.Duration(conf.OnlineTime) * time.Second)
 	getUsersSerial(conf, ctx)
 }

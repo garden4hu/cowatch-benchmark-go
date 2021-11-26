@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -132,6 +133,7 @@ func createWsConn(ctx context.Context, p *userInfo) (*websocket.Conn, error) {
 		EnableCompression: true,
 		WriteBufferSize:   128, // because the longest size of message is 250, 128 is half of the largest size of message according to the guide of gorilla
 		WriteBufferPool:   &sync.Pool{},
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 	}
 	// set http->websocket header
 	rq := http.Header{}
