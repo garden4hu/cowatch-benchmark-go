@@ -7,7 +7,7 @@ import (
 
 func getRoomsParallel(conf *Config, ctx context.Context) {
 	if err := getRooms(ctx, conf); err != nil {
-		log.Errorln(err.Error())
+		logA.Errorln(err.Error())
 		return
 	}
 	if len(rm.Rooms) == 0 {

@@ -88,7 +88,7 @@ func main() {
 	if len(*config) > 0 {
 		conf, err := readConfigure(*config)
 		if err != nil {
-			log.Errorln("failed to read configure, check your path or content of configure file, program will be exited")
+			logA.Errorln("failed to read configure, check your path or content of configure file, program will be exited")
 			return
 		}
 		configure = conf
@@ -99,28 +99,28 @@ func main() {
 		client := &http.Client{Transport: tr}
 		resp, err := client.Get(*remoteConfig)
 		if err != nil {
-			log.Errorln("[error]  Program failed to download configure file from remote source, will be exited")
+			logA.Errorln("[error]  Program failed to download configure file from remote source, will be exited")
 			return
 		}
 		defer resp.Body.Close()
 		b, _ := ioutil.ReadAll(resp.Body)
 		var conf Config
 		if err := json.Unmarshal(b, &conf); err != nil {
-			log.Errorln("failed to read configure file, check your path or make sure the content is ok, program will be exited now")
+			logA.Errorln("failed to read configure file, check your path or make sure the content is ok, program will be exited now")
 			return
 		}
 		configure = &conf
 	} else {
-		log.Errorln("program doesn't support command, please set the configure file, it will be exited now")
+		logA.Errorln("program doesn't support command, please set the configure file, it will be exited now")
 		return
 	}
 	indent, err := json.MarshalIndent(configure, "", "\t")
 	if err == nil {
-		log.Infoln("your configure is :\n", string(indent))
+		logA.Infoln("your configure is :\n", string(indent))
 	}
 
 	if e := checkConfigure(configure); e != nil {
-		log.Errorln(e.Error())
+		logA.Errorln(e.Error())
 		return
 	}
 
@@ -145,7 +145,7 @@ func main() {
 		// create room
 		select {
 		case <-interrupt:
-			logA.Warnln("interrupt by user")
+			logA.Warnln("interrupted by user")
 			// Cleanly close the connection by sending a close message and then
 			// waiting (with timeout) for the server to close the connection.
 

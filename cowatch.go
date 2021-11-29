@@ -124,7 +124,7 @@ func getUsers(conf *Config, ctx context.Context) error {
 				break
 			}
 			if d.Milliseconds() != 0 && base != 0 {
-				log.Infof("join room in batch, size: %d, duration(ms):%d\n", base, d.Milliseconds())
+				logA.Debugf("join room in batch, size: %d, duration(ms):%d\n", base, d.Milliseconds())
 			}
 			if d < lastDuration {
 				base = int(float32(base)*1.4) + 1

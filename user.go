@@ -151,7 +151,7 @@ func createWsConn(ctx context.Context, p *userInfo) (*websocket.Conn, error) {
 	for i := 0; i < 3; i++ {
 		conn, _, err = dialer.DialContext(ctx, u.String(), rq)
 		if err != nil {
-			log.Errorln("websocket dialer error: ", err)
+			logA.Errorln("websocket dialer error: ", err)
 			if i < 3 {
 				time.Sleep(50 * time.Millisecond)
 				continue
@@ -161,7 +161,7 @@ func createWsConn(ctx context.Context, p *userInfo) (*websocket.Conn, error) {
 		}
 	}
 	if err != nil {
-		log.Errorln("failed to dial websocket:", err)
+		logA.Errorln("failed to dial websocket:", err)
 		return nil, err
 	}
 	return conn, nil

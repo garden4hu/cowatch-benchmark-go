@@ -5,9 +5,10 @@ import (
 )
 
 type statistic struct {
+	printed         bool
+	lastRoomSize    int
 	lastOnlineUsers int
-	lastSecondRooms int
-	lastAddPercent  int
+	lastUsersPingOk int
 }
 
 func printLogMessage(roomManager *roomManager) {
@@ -22,20 +23,42 @@ func printLogMessage(roomManager *roomManager) {
 	roomSize := len(roomManager.Rooms)
 	addedUsers := onlineUser - analytics.lastOnlineUsers
 	total := len(roomManager.Rooms) * roomManager.userSize
+
+	roomOKRatio := roomSize * 100 / roomManager.roomSize
+	roomTimeCostAvg := roomManager.GetCreatingRoomAvgDuration().Milliseconds()
+	onlineUsersRatio := onlineUser * 100 / (total)
+	usersPingOk := onlineUserPingOK
+	usersWSCostAvg := roomManager.GetCreatingRoomAvgDuration().Milliseconds()
+	usersNewAdd := addedUsers
+
+	checkNoChanging := func() bool {
+		if analytics.lastRoomSize == roomSize && analytics.lastOnlineUsers == onlineUser && analytics.lastUsersPingOk == onlineUserPingOK {
+			return false
+		}
+		return true
+	}
+
+	if !checkNoChanging() {
+		if analytics.printed {
+			return
+		}
+	} else {
+		analytics.printed = false
+	}
 	logA.WithFields(logrus.Fields{
-		"已创建房间":                roomSize,
-		"room比例":               roomSize * 100 / roomManager.roomSize,
-		"http cost(ms)":        roomManager.GetCreatingRoomAvgDuration().Milliseconds(),
-		"用户在线数":                onlineUser,
-		"user在线比例":             onlineUser * 100 / (total),
-		"user_ping正常数":         onlineUserPingOK,
-		"ws cost(ms)":          roomManager.GetCreatingRoomAvgDuration().Milliseconds(),
-		"新增用户数":                addedUsers,
-		"total http transport": totalTransport,
+		"created_room":          roomSize,
+		"created_room_ratio(%)": roomOKRatio,
+		"HTTP_time_cost":        roomTimeCostAvg,
+		"online_users":          onlineUser,
+		"online_users_ratio(%)": onlineUsersRatio,
+		"users_ping":            usersPingOk,
+		"WS_time_cost":          usersWSCostAvg,
+		"users_added":           usersNewAdd,
+		"transport_pool_size":   totalTransport,
 	}).Println()
 
-	analytics.lastSecondRooms = roomSize
-	analytics.lastAddPercent = onlineUser * 100 / (total)
+	analytics.lastRoomSize = roomSize
 	analytics.lastOnlineUsers = onlineUser
-
+	analytics.lastUsersPingOk = usersPingOk
+	analytics.printed = true
 }

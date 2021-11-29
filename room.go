@@ -100,7 +100,7 @@ func (p *roomUnit) requestCreateRoom(ctx context.Context) error {
 
 	resp, err := newClient.Do(req)
 	if err != nil {
-		log.Errorln("Failed to post, err = ", err)
+		logA.Errorln("Failed to post, err = ", err)
 		return err
 	}
 	p.connectionDuration = time.Since(start)
@@ -112,7 +112,7 @@ func (p *roomUnit) requestCreateRoom(ctx context.Context) error {
 	}()
 
 	if err != nil {
-		log.Errorln(err)
+		logA.Errorln(err)
 		return err
 	}
 
@@ -121,7 +121,7 @@ func (p *roomUnit) requestCreateRoom(ctx context.Context) error {
 	room := new(roomInfo)
 	err = json.Unmarshal(roomRaw, room)
 	if err != nil {
-		log.Errorln("create room: parsed response failed, response data:", string(roomRaw))
+		logA.Errorln("create room: parsed response failed, response data:", string(roomRaw))
 		return err
 	} else if room.Name == "" {
 		logA.Errorln("create room: response is not wanted, response body: ", string(roomRaw))
@@ -178,7 +178,7 @@ func (p *roomUnit) preRequest() {
 	}()
 	_, err := newClient.Do(preReq)
 	if err != nil {
-		log.Errorln("Failed to send OPTIONS method, err = ", err)
+		logA.Errorln("Failed to send OPTIONS method, err = ", err)
 	}
 	// put transport
 	putTransport(tr)

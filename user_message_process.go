@@ -30,7 +30,7 @@ func processMessageWorker(user *userInfo, conn *websocket.Conn) {
 				err := conn.WriteMessage(websocket.TextMessage, pb)
 				user.lock.Unlock()
 				if err != nil {
-					log.Errorln("goID:", user.id, " failed to write ws connection playback message")
+					logA.Errorln("goID:", user.id, " failed to write ws connection playback message")
 					return
 				}
 				timeStampPlayBackMessage = time.Now()
@@ -44,14 +44,14 @@ func processMessageWorker(user *userInfo, conn *websocket.Conn) {
 		} else {
 			reply, err := processResponse(user, message, user.room)
 			if err != nil {
-				log.Errorln("goID:", user.id, " failed to process message: ", string(message))
+				logA.Errorln("goID:", user.id, " failed to process message: ", string(message))
 			}
 			if len(reply) > 0 {
 				user.lock.Lock()
 				err := conn.WriteMessage(websocket.TextMessage, reply)
 				user.lock.Unlock()
 				if err != nil {
-					log.Errorln("goID:", user.id, " failed to write ws connection")
+					logA.Errorln("goID:", user.id, " failed to write ws connection")
 					return
 				}
 			}
@@ -71,7 +71,7 @@ func processResponse(user *userInfo, b []byte, room *roomUnit) (msg []byte, err 
 	case engineTypeOPEN:
 		msg, err = onEngineOpen(user, b, room)
 		if err != nil || len(msg) == 0 {
-			log.Errorln("goID:", user.id, " replay generate error, msg")
+			logA.Errorln("goID:", user.id, " replay generate error, msg")
 		}
 	case engineTypePING: // ping of engineIO
 		logIn.Debugln("goID:", user.id, " ping_pong")
@@ -109,7 +109,7 @@ func onEngineOpen(user *userInfo, b []byte, room *roomUnit) (msg []byte, err err
 	u := new(requestedUserInfo)
 	err = json.Unmarshal(b[1:], u)
 	if err != nil {
-		log.Errorln("goID:", user.id, " failed to parsed the first message, raw msg:", string(b))
+		logA.Errorln("goID:", user.id, " failed to parsed the first message, raw msg:", string(b))
 		return nil, err
 	}
 	user.sid = u.Sid
