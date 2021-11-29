@@ -171,13 +171,15 @@ func onSocketIOEvent(user *userInfo, b []byte, room *roomUnit) (msg []byte, err 
 		}
 	case "REC:roomInit":
 		// get hostIid, lock status and rtcToken
-	case "REC:roster":
 		// get user list. Now join room ok
-
 		room.rm.notifyUserAdd <- 1 // user online
 		user.connected = true
 		logIn.Debugln("goID:", user.id, " get roster, connected")
+		// random distribution
+		time.Sleep(time.Duration(time.Millisecond) * time.Millisecond)
 		msg = generateClockSyncMessage(user, room)
+	case "REC:roster":
+		// user list was merged to roomInit.
 	case "REC:userAdded":
 		// received user added info
 	case "REC:clockSync":
