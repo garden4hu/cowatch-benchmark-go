@@ -61,8 +61,10 @@ func newRoomManager(conf *Config) *roomManager {
 	rm.finishedReqUsersRoutines = 0
 	var playBackAsset ContentInfo
 	playBackAsset.Videos = conf.Video
-	if asset, err := json.Marshal(playBackAsset); err == nil {
-		rm.playBackContent = string(asset)
+	if len(playBackAsset.Videos.Links) != 0 {
+		if asset, err := json.Marshal(playBackAsset); err == nil {
+			rm.playBackContent = string(asset)
+		}
 	}
 	tr := &http.Transport{}
 	rm.tr = tr

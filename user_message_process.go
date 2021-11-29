@@ -24,14 +24,16 @@ func processMessageWorker(user *userInfo, conn *websocket.Conn) {
 	for {
 		if user.hostCoWatch {
 			if time.Since(timeStampPlayBackMessage) > 10*time.Minute {
-				pbStr := "42/" + user.room.ns + ",[\"CMD:contentInfo\"," + user.room.rm.playBackContent + "]"
-				pb := []byte(pbStr)
-				user.lock.Lock()
-				err := conn.WriteMessage(websocket.TextMessage, pb)
-				user.lock.Unlock()
-				if err != nil {
-					logA.Errorln("goID:", user.id, " failed to write ws connection playback message")
-					return
+				if len(user.room.rm.playBackContent) > 0 {
+					pbStr := "42/" + user.room.ns + ",[\"CMD:contentInfo\"," + user.room.rm.playBackContent + "]"
+					pb := []byte(pbStr)
+					user.lock.Lock()
+					err := conn.WriteMessage(websocket.TextMessage, pb)
+					user.lock.Unlock()
+					if err != nil {
+						logA.Errorln("goID:", user.id, " failed to write ws connection playback message")
+						return
+					}
 				}
 				timeStampPlayBackMessage = time.Now()
 			}
